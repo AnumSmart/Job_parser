@@ -28,20 +28,14 @@ func NewHHParser() *HHParser {
 	}
 }
 
-// SearchParams параметры поиска вакансий
-type SearchParams struct {
-	Text    string // Поисковый запрос
-	Area    string // Регион (например, "1" - Москва, "2" - СПб)
-	PerPage int    // Количество вакансий на странице (max 100)
-	Page    int    // Номер страницы
-}
-
-func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]model.Vacancy, error) {
+func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]model.HHVacancy, error) {
 	// Строим URL с параметрами
 	apiURL, err := p.buildURL(params)
 	if err != nil {
 		return nil, fmt.Errorf("build URL failed: %w", err)
 	}
+
+	fmt.Printf("Created URL with params: %s\n", apiURL)
 
 	// Выполняем HTTP запрос
 	resp, err := p.httpClient.Get(apiURL)
@@ -102,7 +96,7 @@ func (p *HHParser) buildURL(params interfaces.SearchParams) (string, error) {
 }
 
 // GetVacancyByID получает детальную информацию о вакансии по ID
-func (p *HHParser) GetVacancyByID(vacancyID string) (*model.Vacancy, error) {
+func (p *HHParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
 	if vacancyID == "" {
 		return nil, fmt.Errorf("vacancy ID cannot be empty")
 	}
@@ -123,7 +117,7 @@ func (p *HHParser) GetVacancyByID(vacancyID string) (*model.Vacancy, error) {
 		return nil, fmt.Errorf("read response failed: %w", err)
 	}
 
-	var vacancy model.Vacancy
+	var vacancy model.HHVacancy
 	if err := json.Unmarshal(body, &vacancy); err != nil {
 		return nil, fmt.Errorf("parse JSON failed: %w", err)
 	}
@@ -132,7 +126,7 @@ func (p *HHParser) GetVacancyByID(vacancyID string) (*model.Vacancy, error) {
 }
 
 // SimpleSearch упрощённый поиск по тексту
-func (p *HHParser) SimpleSearch(query string, limit int) ([]model.Vacancy, error) {
+func (p *HHParser) SimpleSearch(query string, limit int) ([]model.HHVacancy, error) {
 	params := interfaces.SearchParams{
 		Text:    query,
 		PerPage: limit,

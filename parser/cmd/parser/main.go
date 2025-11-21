@@ -119,13 +119,13 @@ func printMultiSearchResults(results []manager.SearchResult) {
 
 		// Показываем первые 3 вакансии из каждого источника
 		for i, vacancy := range result.Vacancies {
-			if i >= 3 {
+			if i >= 10 {
 				break
 			}
-			fmt.Printf("      %d. %s - %s\n", i+1, vacancy.Name, vacancy.GetSalaryString())
+			fmt.Printf("      %d. %s - %s, company:%s, URL:%s\n", i+1, vacancy.Name, vacancy.GetSalaryString(), vacancy.Employer.Name, vacancy.URL)
 		}
 
-		if len(result.Vacancies) > 3 {
+		if len(result.Vacancies) > 10 {
 			fmt.Printf("      ... и ещё %d\n", len(result.Vacancies)-3)
 		}
 	}
@@ -195,7 +195,7 @@ func getVacancyDetails(hhParser *parser.HHParser, scanner *bufio.Scanner) {
 	printVacancyDetails(vacancy)
 }
 
-func printVacancies(vacancies []model.Vacancy) {
+func printVacancies(vacancies []model.HHVacancy) {
 	if len(vacancies) == 0 {
 		fmt.Println("😞 Вакансии не найдены")
 		return
@@ -212,7 +212,7 @@ func printVacancies(vacancies []model.Vacancy) {
 	}
 }
 
-func printVacancyDetails(vacancy *model.Vacancy) {
+func printVacancyDetails(vacancy *model.HHVacancy) {
 	fmt.Println("\n" + strings.Repeat("=", 50))
 	fmt.Printf("🏢 %s\n", vacancy.Name)
 	fmt.Println(strings.Repeat("=", 50))

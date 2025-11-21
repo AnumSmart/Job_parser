@@ -32,7 +32,7 @@ func (p *SuperJobParser) GetName() string {
 	return "SuperJob"
 }
 
-func (p *SuperJobParser) SearchVacancies(params interfaces.SearchParams) ([]model.Vacancy, error) {
+func (p *SuperJobParser) SearchVacancies(params interfaces.SearchParams) ([]model.HHVacancy, error) {
 	apiURL, err := p.buildURL(params)
 	if err != nil {
 		return nil, fmt.Errorf("build URL failed: %w", err)
@@ -68,7 +68,7 @@ func (p *SuperJobParser) SearchVacancies(params interfaces.SearchParams) ([]mode
 		return nil, fmt.Errorf("parse JSON failed: %w", err)
 	}
 
-	return p.convertToVacancies(sjResponse.Objects), nil
+	return p.convertToVacancies(sjResponse.Items), nil
 }
 
 func (p *SuperJobParser) buildURL(params interfaces.SearchParams) (string, error) {
@@ -108,10 +108,10 @@ func (p *SuperJobParser) convertArea(area string) string {
 	return ""
 }
 
-func (p *SuperJobParser) convertToVacancies(sjVacancies []model.SuperJobVacancy) []model.Vacancy {
-	vacancies := make([]model.Vacancy, len(sjVacancies))
+func (p *SuperJobParser) convertToVacancies(sjVacancies []model.SuperJobVacancy) []model.HHVacancy {
+	vacancies := make([]model.HHVacancy, len(sjVacancies))
 	for i, sjv := range sjVacancies {
-		vacancies[i] = model.Vacancy{
+		vacancies[i] = model.HHVacancy{
 			ID:   strconv.Itoa(sjv.ID),
 			Name: sjv.Profession,
 			Salary: model.Salary{
@@ -132,13 +132,13 @@ func (p *SuperJobParser) convertToVacancies(sjVacancies []model.SuperJobVacancy)
 	return vacancies
 }
 
-func (p *SuperJobParser) GetVacancyByID(vacancyID string) (*model.Vacancy, error) {
+func (p *SuperJobParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
 	// Реализация получения деталей вакансии по ID
 	// Аналогично HH Parser
 	return nil, nil
 }
 
-func (p *SuperJobParser) SimpleSearch(query string, limit int) ([]model.Vacancy, error) {
+func (p *SuperJobParser) SimpleSearch(query string, limit int) ([]model.HHVacancy, error) {
 	params := interfaces.SearchParams{
 		Text:    query,
 		PerPage: limit,

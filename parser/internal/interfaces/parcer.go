@@ -3,9 +3,9 @@ package interfaces
 import "parser/internal/model"
 
 type Parser interface {
-	SearchVacancies(params SearchParams) ([]model.Vacancy, error)
-	GetVacancyByID(vacancyID string) (*model.Vacancy, error)
-	SimpleSearch(query string, limit int) ([]model.Vacancy, error)
+	SearchVacancies(params SearchParams) ([]model.HHVacancy, error)
+	GetVacancyByID(vacancyID string) (*model.HHVacancy, error)
+	SimpleSearch(query string, limit int) ([]model.HHVacancy, error)
 	GetName() string
 }
 

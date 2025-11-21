@@ -2,8 +2,8 @@ package model
 
 // Структуры для SuperJob API
 type SuperJobResponse struct {
-	Objects []SuperJobVacancy `json:"objects"`
-	Total   int               `json:"total"`
+	Items []SuperJobVacancy `json:"objects"`
+	Total int               `json:"total"`
 }
 
 type SuperJobVacancy struct {
