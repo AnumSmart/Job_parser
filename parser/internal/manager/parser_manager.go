@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"parser/internal/interfaces"
-	"parser/internal/model"
 	"sync"
 	"time"
 )
@@ -21,7 +20,7 @@ func NewParserManager(parsers ...interfaces.Parser) *ParserManager {
 
 type SearchResult struct {
 	ParserName string
-	Vacancies  []model.HHVacancy
+	Vacancies  []interfaces.Vacancy
 	Error      error
 	Duration   time.Duration
 }

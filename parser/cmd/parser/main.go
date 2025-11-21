@@ -42,10 +42,8 @@ func main() {
 		case "1":
 			multiSearch(parserManager, scanner)
 		case "2":
-			searchByQuery(hhParser, scanner)
-		case "3":
 			getVacancyDetails(hhParser, scanner)
-		case "4":
+		case "3":
 			fmt.Println("👋 До свидания!")
 			return
 		default:
@@ -59,9 +57,8 @@ func main() {
 func printMenu() {
 	fmt.Println("📋 Меню:")
 	fmt.Println("1. Поиск вакансий (расширенный)")
-	fmt.Println("2. Быстрый поиск по запросу")
-	fmt.Println("3. Получить детали вакансии по ID")
-	fmt.Println("4. Выход")
+	fmt.Println("2. Получить детали вакансии по ID")
+	fmt.Println("3. Выход")
 }
 
 // Функция для мульти-поиска
@@ -122,7 +119,7 @@ func printMultiSearchResults(results []manager.SearchResult) {
 			if i >= 10 {
 				break
 			}
-			fmt.Printf("      %d. %s - %s, company:%s, URL:%s\n", i+1, vacancy.Name, vacancy.GetSalaryString(), vacancy.Employer.Name, vacancy.URL)
+			fmt.Printf("      %d. %s - %s, company:%s, URL:[ %s ], ID:%s\n", i+1, vacancy.Job, *vacancy.Salary, vacancy.Company, vacancy.URL, vacancy.ID)
 		}
 
 		if len(result.Vacancies) > 10 {
@@ -131,43 +128,6 @@ func printMultiSearchResults(results []manager.SearchResult) {
 	}
 
 	fmt.Printf("\n🎯 Всего найдено: %d вакансий\n", totalVacancies)
-}
-
-func searchByQuery(hhParser *parser.HHParser, scanner *bufio.Scanner) {
-	fmt.Println("\n⚡ Быстрый поиск")
-
-	fmt.Print("Введите поисковый запрос: ")
-	if !scanner.Scan() {
-		return
-	}
-
-	query := strings.TrimSpace(scanner.Text())
-	if query == "" {
-		fmt.Println("❌ Запрос не может быть пустым")
-		return
-	}
-
-	fmt.Print("Количество вакансий (max 100): ")
-	var limit int = 10
-	if scanner.Scan() {
-		limitStr := strings.TrimSpace(scanner.Text())
-		if limitStr != "" {
-			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-				limit = l
-			}
-		}
-	}
-
-	fmt.Println("⏳ Ищем вакансии...")
-
-	vacancies, err := hhParser.SimpleSearch(query, limit)
-	if err != nil {
-		fmt.Printf("❌ Ошибка при поиске: %v\n", err)
-		return
-	}
-
-	fmt.Printf("✅ Найдено %d вакансий по запросу '%s'\n", len(vacancies), query)
-	printVacancies(vacancies)
 }
 
 func getVacancyDetails(hhParser *parser.HHParser, scanner *bufio.Scanner) {

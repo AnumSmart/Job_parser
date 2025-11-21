@@ -6,14 +6,13 @@ import (
 
 // HHVacancy представляет структуру вакансии с HH.ru
 type HHVacancy struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Salary   Salary   `json:"salary"`
-	Employer Employer `json:"employer"`
-	Area     Area     `json:"area"`
-	//	PublishedAt time.Time `json:"published_at"`
-	URL         string `json:"url"`
-	Description string `json:"description"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Salary      Salary   `json:"salary"`
+	Employer    Employer `json:"employer"`
+	Area        Area     `json:"area"`
+	URL         string   `json:"url"`
+	Description string   `json:"description"`
 }
 
 // GetSalaryString возвращает форматированную строку зарплаты

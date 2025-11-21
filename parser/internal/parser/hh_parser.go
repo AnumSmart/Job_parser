@@ -28,7 +28,7 @@ func NewHHParser() *HHParser {
 	}
 }
 
-func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]model.HHVacancy, error) {
+func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]interfaces.Vacancy, error) {
 	// Строим URL с параметрами
 	apiURL, err := p.buildURL(params)
 	if err != nil {
@@ -61,7 +61,29 @@ func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]model.HHVa
 		return nil, fmt.Errorf("parse JSON failed: %w", err)
 	}
 
-	return searchResponse.Items, nil
+	return p.ConvertToUniversal(searchResponse.Items), nil
+}
+
+// Приводит структуры найденных результатов к универсальной структуре для всех парсеров
+func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []interfaces.Vacancy {
+	var universalVacancies []interfaces.Vacancy
+
+	for _, hhvacancy := range hhVavancies {
+		// получаем строку-описания вилки зарплаты для каждой найденной записи
+		salary := hhvacancy.GetSalaryString()
+
+		universalVacancies = append(universalVacancies, interfaces.Vacancy{
+			ID:       hhvacancy.ID,
+			Job:      hhvacancy.Name,
+			Company:  hhvacancy.Employer.Name,
+			Currency: hhvacancy.Salary.Currency,
+			Salary:   &salary,
+			Area:     hhvacancy.Area.Name,
+			URL:      hhvacancy.URL,
+			Seeker:   p.GetName(),
+		})
+	}
+	return universalVacancies
 }
 
 // buildURL строит URL для API запроса
@@ -123,15 +145,6 @@ func (p *HHParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
 	}
 
 	return &vacancy, nil
-}
-
-// SimpleSearch упрощённый поиск по тексту
-func (p *HHParser) SimpleSearch(query string, limit int) ([]model.HHVacancy, error) {
-	params := interfaces.SearchParams{
-		Text:    query,
-		PerPage: limit,
-	}
-	return p.SearchVacancies(params)
 }
 
 // получаем имя парсера

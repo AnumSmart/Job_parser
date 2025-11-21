@@ -1,5 +1,7 @@
 package model
 
+import "parser/pkg"
+
 // Структуры для SuperJob API
 type SuperJobResponse struct {
 	Items []SuperJobVacancy `json:"objects"`
@@ -20,4 +22,18 @@ type SuperJobVacancy struct {
 
 type Town struct {
 	Title string `json:"title"`
+}
+
+func (v SuperJobVacancy) GetSalaryString() string {
+	if v.PaymentFrom == 0 && v.PaymentTo == 0 {
+		return "не указана"
+	}
+
+	if v.PaymentFrom > 0 && v.PaymentTo > 0 {
+		return pkg.FormatSalary(v.PaymentFrom, v.PaymentTo, v.Currency)
+	} else if v.PaymentFrom > 0 {
+		return pkg.FormatSalary(v.PaymentFrom, 0, v.Currency)
+	} else {
+		return pkg.FormatSalary(0, v.PaymentTo, v.Currency)
+	}
 }

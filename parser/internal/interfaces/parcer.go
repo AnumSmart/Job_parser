@@ -1,11 +1,11 @@
 package interfaces
 
-import "parser/internal/model"
+import (
+	"time"
+)
 
 type Parser interface {
-	SearchVacancies(params SearchParams) ([]model.HHVacancy, error)
-	GetVacancyByID(vacancyID string) (*model.HHVacancy, error)
-	SimpleSearch(query string, limit int) ([]model.HHVacancy, error)
+	SearchVacancies(params SearchParams) ([]Vacancy, error)
 	GetName() string
 }
 
@@ -14,4 +14,18 @@ type SearchParams struct {
 	Area    string
 	PerPage int
 	Page    int
+}
+
+type Vacancy struct {
+	ID          string
+	Job         string
+	Company     string
+	Salary      *string
+	Currency    string
+	Area        string
+	Experience  string
+	Schedule    string
+	URL         string
+	PublishedAt time.Time
+	Seeker      string // "hh", "superjob"
 }
