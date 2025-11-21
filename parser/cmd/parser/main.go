@@ -2,8 +2,11 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"parser/internal/interfaces"
+	"parser/internal/manager"
 	"parser/internal/model"
 	"parser/internal/parser"
 	"strconv"
@@ -12,11 +15,15 @@ import (
 )
 
 func main() {
-	fmt.Println("🚀 HH.ru Parser запущен!")
+	fmt.Println("🚀 Multi-Source Vacancy Parser запущен!")
 	fmt.Println("==========================")
 
-	// Создаём парсер
+	// Создаём парсеры
 	hhParser := parser.NewHHParser()
+	sjParser := parser.NewSuperJobParser(os.Getenv("SUPERJOB_API_KEY"))
+
+	// Создаём менеджер парсеров
+	parserManager := manager.NewParserManager(hhParser, sjParser)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)
@@ -33,7 +40,7 @@ func main() {
 
 		switch choice {
 		case "1":
-			searchVacancies(hhParser, scanner)
+			multiSearch(parserManager, scanner)
 		case "2":
 			searchByQuery(hhParser, scanner)
 		case "3":
@@ -57,25 +64,18 @@ func printMenu() {
 	fmt.Println("4. Выход")
 }
 
-func searchVacancies(hhParser *parser.HHParser, scanner *bufio.Scanner) {
-	fmt.Println("\n🔍 Расширенный поиск вакансий")
+// Функция для мульти-поиска
+func multiSearch(parserManager *manager.ParserManager, scanner *bufio.Scanner) {
+	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
-	params := parser.SearchParams{}
+	var params interfaces.SearchParams
 
-	fmt.Print("Введите поисковый запрос (например, 'Golang разработчик'): ")
+	fmt.Print("Введите поисковый запрос: ")
 	if scanner.Scan() {
 		params.Text = strings.TrimSpace(scanner.Text())
 	}
 
-	fmt.Print("Введите регион (1-Москва, 2-СПб, Enter - все): ")
-	if scanner.Scan() {
-		area := strings.TrimSpace(scanner.Text())
-		if area != "" {
-			params.Area = area
-		}
-	}
-
-	fmt.Print("Количество вакансий (max 100, Enter - 20): ")
+	fmt.Print("Количество вакансий на источник (max 50): ")
 	if scanner.Scan() {
 		countStr := strings.TrimSpace(scanner.Text())
 		if countStr != "" {
@@ -89,19 +89,48 @@ func searchVacancies(hhParser *parser.HHParser, scanner *bufio.Scanner) {
 		params.PerPage = 20
 	}
 
-	fmt.Println("⏳ Ищем вакансии...")
+	fmt.Println("⏳ Ищем вакансии во всех источниках...")
 
-	startTime := time.Now()
-	vacancies, err := hhParser.SearchVacancies(params)
-	elapsed := time.Since(startTime)
+	ctx := context.Background()
+	results, err := parserManager.ConcurrentSearchWithTimeout(ctx, params, 10*time.Second)
 
 	if err != nil {
 		fmt.Printf("❌ Ошибка при поиске: %v\n", err)
 		return
 	}
 
-	fmt.Printf("✅ Найдено %d вакансий (за %v)\n", len(vacancies), elapsed)
-	printVacancies(vacancies)
+	printMultiSearchResults(results)
+}
+
+func printMultiSearchResults(results []manager.SearchResult) {
+	totalVacancies := 0
+
+	for _, result := range results {
+		fmt.Printf("\n📊 %s:\n", result.ParserName)
+		fmt.Printf("   ⏱️  Время: %v\n", result.Duration)
+
+		if result.Error != nil {
+			fmt.Printf("   ❌ Ошибка: %v\n", result.Error)
+			continue
+		}
+
+		fmt.Printf("   ✅ Найдено: %d вакансий\n", len(result.Vacancies))
+		totalVacancies += len(result.Vacancies)
+
+		// Показываем первые 3 вакансии из каждого источника
+		for i, vacancy := range result.Vacancies {
+			if i >= 3 {
+				break
+			}
+			fmt.Printf("      %d. %s - %s\n", i+1, vacancy.Name, vacancy.GetSalaryString())
+		}
+
+		if len(result.Vacancies) > 3 {
+			fmt.Printf("      ... и ещё %d\n", len(result.Vacancies)-3)
+		}
+	}
+
+	fmt.Printf("\n🎯 Всего найдено: %d вакансий\n", totalVacancies)
 }
 
 func searchByQuery(hhParser *parser.HHParser, scanner *bufio.Scanner) {

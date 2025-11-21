@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"parser/internal/interfaces"
 	"parser/internal/model"
 	"strconv"
 	"time"
@@ -35,7 +36,7 @@ type SearchParams struct {
 	Page    int    // Номер страницы
 }
 
-func (p *HHParser) SearchVacancies(params SearchParams) ([]model.Vacancy, error) {
+func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]model.Vacancy, error) {
 	// Строим URL с параметрами
 	apiURL, err := p.buildURL(params)
 	if err != nil {
@@ -70,7 +71,7 @@ func (p *HHParser) SearchVacancies(params SearchParams) ([]model.Vacancy, error)
 }
 
 // buildURL строит URL для API запроса
-func (p *HHParser) buildURL(params SearchParams) (string, error) {
+func (p *HHParser) buildURL(params interfaces.SearchParams) (string, error) {
 	u, err := url.Parse(p.baseURL)
 	if err != nil {
 		return "", err
@@ -132,9 +133,14 @@ func (p *HHParser) GetVacancyByID(vacancyID string) (*model.Vacancy, error) {
 
 // SimpleSearch упрощённый поиск по тексту
 func (p *HHParser) SimpleSearch(query string, limit int) ([]model.Vacancy, error) {
-	params := SearchParams{
+	params := interfaces.SearchParams{
 		Text:    query,
 		PerPage: limit,
 	}
 	return p.SearchVacancies(params)
+}
+
+// получаем имя парсера
+func (p *HHParser) GetName() string {
+	return "HH.ru"
 }

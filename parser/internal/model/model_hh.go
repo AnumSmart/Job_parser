@@ -12,7 +12,7 @@ type Vacancy struct {
 	Salary   Salary   `json:"salary"`
 	Employer Employer `json:"employer"`
 	Area     Area     `json:"area"`
-	//PublishedAt time.Time `json:"published_at"`
+	//	PublishedAt time.Time `json:"published_at"`
 	URL         string `json:"url"`
 	Description string `json:"description"`
 }
