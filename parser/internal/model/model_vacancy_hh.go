@@ -1,8 +1,6 @@
 package model
 
-import (
-	"parser/pkg"
-)
+import "job_parser/pkg"
 
 // HHVacancy представляет структуру вакансии с HH.ru
 type HHVacancy struct {

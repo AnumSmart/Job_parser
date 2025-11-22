@@ -3,7 +3,8 @@ package manager
 import (
 	"context"
 	"fmt"
-	"parser/internal/interfaces"
+	"job_parser/internal/interfaces"
+
 	"sync"
 	"time"
 )
