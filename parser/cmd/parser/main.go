@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"parser/configs"
 	"parser/internal/interfaces"
 	"parser/internal/manager"
 	"parser/internal/model"
@@ -19,12 +20,18 @@ func main() {
 	fmt.Println("🚀 Multi-Source Vacancy Parser запущен!")
 	fmt.Println("==========================")
 
+	// создаём config
+	conf, err := configs.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
+
 	// Создаём парсеры
 	hhParser := parser.NewHHParser()
-	sjParser := parser.NewSuperJobParser(os.Getenv("SUPERJOB_API_KEY"))
+	sjParser := parser.NewSuperJobParser(conf.Api_conf.SJ_api_key)
 
 	// Создаём менеджер парсеров
-	parserManager := manager.NewParserManager(hhParser, sjParser)
+	parserManager := manager.NewParserManager(conf, hhParser, sjParser)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)

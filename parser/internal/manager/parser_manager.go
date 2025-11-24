@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"parser/configs"
 	"parser/internal/interfaces"
 
 	"sync"
@@ -11,11 +12,13 @@ import (
 
 type ParserManager struct {
 	parsers []interfaces.Parser
+	config  *configs.Config
 }
 
-func NewParserManager(parsers ...interfaces.Parser) *ParserManager {
+func NewParserManager(config *configs.Config, parsers ...interfaces.Parser) *ParserManager {
 	return &ParserManager{
 		parsers: parsers,
+		config:  config,
 	}
 }
 
