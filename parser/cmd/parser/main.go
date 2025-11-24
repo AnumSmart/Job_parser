@@ -2,16 +2,13 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"parser/configs"
-	"parser/internal/interfaces"
 	"parser/internal/manager"
 	"parser/internal/model"
 	"parser/internal/parser"
 
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -48,7 +45,7 @@ func main() {
 
 		switch choice {
 		case "1":
-			multiSearch(parserManager, scanner)
+			parserManager.MultiSearch(scanner)
 		case "2":
 			getVacancyDetails(hhParser, scanner)
 		case "3":
@@ -67,75 +64,6 @@ func printMenu() {
 	fmt.Println("1. Поиск вакансий (расширенный)")
 	fmt.Println("2. Получить детали вакансии по ID")
 	fmt.Println("3. Выход")
-}
-
-// Функция для мульти-поиска
-func multiSearch(parserManager *manager.ParserManager, scanner *bufio.Scanner) {
-	fmt.Println("\n🌐 Мульти-поиск вакансий")
-
-	var params interfaces.SearchParams
-
-	fmt.Print("Введите поисковый запрос: ")
-	if scanner.Scan() {
-		params.Text = strings.TrimSpace(scanner.Text())
-	}
-
-	fmt.Print("Количество вакансий на источник (max 50): ")
-	if scanner.Scan() {
-		countStr := strings.TrimSpace(scanner.Text())
-		if countStr != "" {
-			if count, err := strconv.Atoi(countStr); err == nil && count > 0 {
-				params.PerPage = count
-			}
-		}
-	}
-
-	if params.PerPage == 0 {
-		params.PerPage = 20
-	}
-
-	fmt.Println("⏳ Ищем вакансии во всех источниках...")
-
-	ctx := context.Background()
-	results, err := parserManager.ConcurrentSearchWithTimeout(ctx, params, 10*time.Second)
-
-	if err != nil {
-		fmt.Printf("❌ Ошибка при поиске: %v\n", err)
-		return
-	}
-
-	printMultiSearchResults(results)
-}
-
-func printMultiSearchResults(results []manager.SearchResult) {
-	totalVacancies := 0
-
-	for _, result := range results {
-		fmt.Printf("\n📊 %s:\n", result.ParserName)
-		fmt.Printf("   ⏱️  Время: %v\n", result.Duration)
-
-		if result.Error != nil {
-			fmt.Printf("   ❌ Ошибка: %v\n", result.Error)
-			continue
-		}
-
-		fmt.Printf("   ✅ Найдено: %d вакансий\n", len(result.Vacancies))
-		totalVacancies += len(result.Vacancies)
-
-		// Показываем первые 3 вакансии из каждого источника
-		for i, vacancy := range result.Vacancies {
-			if i >= 10 {
-				break
-			}
-			fmt.Printf("      %d. %s - %s, company:%s, URL:[ %s ], ID:%s\n", i+1, vacancy.Job, *vacancy.Salary, vacancy.Company, vacancy.URL, vacancy.ID)
-		}
-
-		if len(result.Vacancies) > 10 {
-			fmt.Printf("      ... и ещё %d\n", len(result.Vacancies)-3)
-		}
-	}
-
-	fmt.Printf("\n🎯 Всего найдено: %d вакансий\n", totalVacancies)
 }
 
 func getVacancyDetails(hhParser *parser.HHParser, scanner *bufio.Scanner) {
