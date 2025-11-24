@@ -4,11 +4,11 @@ import "parser/pkg"
 
 // Структуры для SuperJob API
 type SuperJobResponse struct {
-	Items []SuperJobVacancy `json:"objects"`
-	Total int               `json:"total"`
+	Items []SJVacancy `json:"objects"`
+	Total int         `json:"total"`
 }
 
-type SuperJobVacancy struct {
+type SJVacancy struct {
 	ID              int    `json:"id"`
 	Profession      string `json:"profession"`
 	FirmName        string `json:"firm_name"`
@@ -24,7 +24,7 @@ type Town struct {
 	Title string `json:"title"`
 }
 
-func (v SuperJobVacancy) GetSalaryString() string {
+func (v SJVacancy) GetSalaryString() string {
 	if v.PaymentFrom == 0 && v.PaymentTo == 0 {
 		return "не указана"
 	}

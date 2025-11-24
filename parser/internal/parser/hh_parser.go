@@ -68,13 +68,14 @@ func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]interfaces
 
 // Приводит структуры найденных результатов к универсальной структуре для всех парсеров
 func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []interfaces.Vacancy {
-	var universalVacancies []interfaces.Vacancy
+	// сразу инициализируем слайс универсальных вакансий, чтобы уменьшить количество переаалокаций, если выйдем за размер базового массива слайса
+	universalVacancies := make([]interfaces.Vacancy, len(hhVavancies))
 
-	for _, hhvacancy := range hhVavancies {
+	for i, hhvacancy := range hhVavancies {
 		// получаем строку-описания вилки зарплаты для каждой найденной записи
 		salary := hhvacancy.GetSalaryString()
 
-		universalVacancies = append(universalVacancies, interfaces.Vacancy{
+		universalVacancies[i] = interfaces.Vacancy{
 			ID:       hhvacancy.ID,
 			Job:      hhvacancy.Name,
 			Company:  hhvacancy.Employer.Name,
@@ -83,7 +84,7 @@ func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []interface
 			Area:     hhvacancy.Area.Name,
 			URL:      hhvacancy.URL,
 			Seeker:   p.GetName(),
-		})
+		}
 	}
 	return universalVacancies
 }
@@ -132,6 +133,7 @@ func (p *HHParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
 	}
 	defer resp.Body.Close()
 
+	// если API - вернул ошибку, прерываем функцию
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
@@ -142,8 +144,9 @@ func (p *HHParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
 	}
 
 	var vacancy model.HHVacancy
+	//анмаршалим успешное тело ответа в в нужную структуру
 	if err := json.Unmarshal(body, &vacancy); err != nil {
-		return nil, fmt.Errorf("parse JSON failed: %w", err)
+		return nil, fmt.Errorf("parse HH-JSON failed: %w", err)
 	}
 
 	return &vacancy, nil

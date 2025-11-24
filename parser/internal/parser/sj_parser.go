@@ -109,7 +109,7 @@ func (p *SuperJobParser) convertArea(area string) string {
 	return ""
 }
 
-func (p *SuperJobParser) convertToUniversal(sjVacancies []model.SuperJobVacancy) []interfaces.Vacancy {
+func (p *SuperJobParser) convertToUniversal(sjVacancies []model.SJVacancy) []interfaces.Vacancy {
 	vacancies := make([]interfaces.Vacancy, len(sjVacancies))
 	for i, sjv := range sjVacancies {
 		salary := sjv.GetSalaryString()
@@ -127,8 +127,34 @@ func (p *SuperJobParser) convertToUniversal(sjVacancies []model.SuperJobVacancy)
 	return vacancies
 }
 
-func (p *SuperJobParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
+func (p *SuperJobParser) GetVacancyByID(vacancyID string) (*model.SJVacancy, error) {
 	// Реализация получения деталей вакансии по ID
-	// Аналогично HH Parser
-	return nil, nil
+	if vacancyID == "" {
+		return nil, fmt.Errorf("vacancy ID cannot be empty")
+	}
+
+	apiURL := p.baseURL + "/" + vacancyID
+	resp, err := p.httpClient.Get(apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// если API - вернул ошибку, прерываем функцию
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response failed: %w", err)
+	}
+
+	//анмаршалим успешное тело ответа в в нужную структуру
+	var vacancy model.SJVacancy
+	if err := json.Unmarshal(body, &vacancy); err != nil {
+		return nil, fmt.Errorf("parse SJ-JSON failed: %w", err)
+	}
+
+	return &vacancy, nil
 }
