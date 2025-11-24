@@ -14,3 +14,5 @@
 - кэширование результатов поиска в Redis (с TTL)
 - логирование
 - тесты
+
+repo: https://github.com/AnumSmart/Job_parser.git
