@@ -1,7 +1,7 @@
 package inmemory_cache
 
 import (
-	"parser/internal/domain/models"
+	"job_parser/internal/domain/models"
 	"sync"
 	"time"
 )

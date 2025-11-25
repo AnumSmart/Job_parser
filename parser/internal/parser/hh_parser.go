@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"parser/internal/domain/models"
-	"parser/internal/model"
+	"job_parser/internal/domain/models"
+	"job_parser/internal/model"
 
 	"net/http"
 	"net/url"
