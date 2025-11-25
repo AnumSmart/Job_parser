@@ -66,7 +66,7 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 		return
 	}
 
-	pm.printMultiSearchResults(results)
+	pm.printMultiSearchResults(results, params.PerPage)
 }
 
 // concurrentSearchWithTimeout выполняет поиск во всех парсерах одновременно с таймаутом
@@ -138,7 +138,7 @@ func (pm *ParserManager) GetParserNames() []string {
 	return names
 }
 
-func (pm *ParserManager) printMultiSearchResults(results []SearchResult) {
+func (pm *ParserManager) printMultiSearchResults(results []SearchResult, resultsPerPage int) {
 	totalVacancies := 0
 
 	for _, result := range results {
@@ -155,14 +155,14 @@ func (pm *ParserManager) printMultiSearchResults(results []SearchResult) {
 
 		// Показываем первые 3 вакансии из каждого источника
 		for i, vacancy := range result.Vacancies {
-			if i >= 10 {
+			if i >= resultsPerPage {
 				break
 			}
 			fmt.Printf("      %d. %s - %s, company:%s, URL:[ %s ], ID:%s\n", i+1, vacancy.Job, *vacancy.Salary, vacancy.Company, vacancy.URL, vacancy.ID)
 		}
 
-		if len(result.Vacancies) > 10 {
-			fmt.Printf("      ... и ещё %d\n", len(result.Vacancies)-3)
+		if len(result.Vacancies) > resultsPerPage {
+			fmt.Printf("      ... и ещё %d\n", len(result.Vacancies)-resultsPerPage)
 		}
 	}
 
