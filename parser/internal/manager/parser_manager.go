@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"parser/configs"
 	"parser/internal/domain/models"
+	"parser/internal/inmemory_cache"
 	"parser/internal/interfaces"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ func NewParserManager(config *configs.Config, parsers ...interfaces.Parser) *Par
 }
 
 // Метод для мульти-поиска
-func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
+func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner, cash *inmemory_cache.InmemoryShardedCache) {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
 	var params models.SearchParams
@@ -55,16 +56,26 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 		params.PerPage = 20
 	}
 
-	searchHash, _ := GenHashFromSearchParam(params)
+	searchHash, _ := GenHashFromSearchParam(params) // ****!!!! нужно обработать ошибку
 	fmt.Println("Сформированный хэш:", searchHash)
-	fmt.Println("⏳ Ищем вакансии во всех источниках...")
 
+	fmt.Println("⏳ Ищем вакансии в кэше...")
+	searchRes, ok := cash.GetItem(searchHash)
+	if ok {
+		pm.printMultiSearchResults(searchRes, params.PerPage)
+		return
+	}
+
+	fmt.Println("Не удалось найти данные в кэше ⏳ Ищем вакансии во всех источниках...")
+	//fmt.Println("⏳ Ищем вакансии во всех источниках...")
 	ctx := context.Background()
 	results, err := pm.concurrentSearchWithTimeout(ctx, params, 10*time.Second)
 	if err != nil {
 		fmt.Printf("❌ Ошибка при поиске: %v\n", err)
 		return
 	}
+	//записываем данные в кэш
+	cash.AddItemWithTTL(searchHash, results, time.Minute)
 
 	pm.printMultiSearchResults(results, params.PerPage)
 }

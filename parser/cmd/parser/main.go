@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"parser/configs"
+	"parser/internal/inmemory_cache"
 	"parser/internal/manager"
 	"parser/internal/model"
 	"parser/internal/parser"
@@ -28,7 +29,7 @@ func main() {
 	}
 
 	//создаём экземпляр inmemory cache
-	//cacheSh := inmemory_cache.NewInmemoryShardedCache(numOfShards, time.Minute)
+	cacheSh := inmemory_cache.NewInmemoryShardedCache(numOfShards, time.Minute)
 
 	// Создаём парсеры
 	hhParser := parser.NewHHParser()
@@ -52,7 +53,7 @@ func main() {
 
 		switch choice {
 		case "1":
-			parserManager.MultiSearch(scanner)
+			parserManager.MultiSearch(scanner, cacheSh)
 		case "2":
 			getVacancyDetails(hhParser, scanner)
 		case "3":
