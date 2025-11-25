@@ -18,6 +18,7 @@ type ParserManager struct {
 	config  *configs.Config
 }
 
+// Конструктор для мэнеджера парсинга из разных источников
 func NewParserManager(config *configs.Config, parsers ...interfaces.Parser) *ParserManager {
 	return &ParserManager{
 		parsers: parsers,
@@ -25,6 +26,7 @@ func NewParserManager(config *configs.Config, parsers ...interfaces.Parser) *Par
 	}
 }
 
+// Структура для определния результатов поиска
 type SearchResult struct {
 	ParserName string
 	Vacancies  []interfaces.Vacancy
@@ -138,6 +140,7 @@ func (pm *ParserManager) GetParserNames() []string {
 	return names
 }
 
+// Метод для вывода в консоль результатов поиска (с нужными атрибутами)
 func (pm *ParserManager) printMultiSearchResults(results []SearchResult, resultsPerPage int) {
 	totalVacancies := 0
 
