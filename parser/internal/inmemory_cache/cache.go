@@ -1,10 +1,10 @@
-package cache
+package inmemory_cache
 
 import (
 	"fmt"
 	"hash/fnv"
 	"log"
-	"parser/internal/manager"
+	"parser/internal/domain/models"
 	"time"
 )
 
@@ -35,7 +35,7 @@ func NewInmemoryShardedCache(numShards int, TTL time.Duration) *InmemoryShardedC
 // чтобы реализовать этот метод - нужна функция, которая будет находить нужный шард по заданному ключу (внутри будет хэш-функция)
 // результатом будет значение в CashItem и флаг
 
-func (c *InmemoryShardedCache) GetItem(key string) ([]manager.SearchResult, bool) {
+func (c *InmemoryShardedCache) GetItem(key string) ([]models.SearchResult, bool) {
 	// получаем необходимый шард
 	shard := c.GetShard(key)
 	now := time.Now()
@@ -73,7 +73,7 @@ func (c *InmemoryShardedCache) GetShard(key string) *Shard {
 }
 
 // метод, чтобы записать значение в кэш с заданным TTL
-func (c *InmemoryShardedCache) AddItemWithTTL(key string, value []manager.SearchResult, ttl time.Duration) {
+func (c *InmemoryShardedCache) AddItemWithTTL(key string, value []models.SearchResult, ttl time.Duration) {
 	// получаем необходимый шард
 	shard := c.GetShard(key)
 	now := time.Now()

@@ -1,4 +1,4 @@
-package cache
+package inmemory_cache
 
 import "time"
 

@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"parser/internal/interfaces"
+	"parser/internal/domain/models"
 	"parser/internal/model"
 
 	"strconv"
@@ -33,7 +33,7 @@ func (p *SuperJobParser) GetName() string {
 	return "SuperJob"
 }
 
-func (p *SuperJobParser) SearchVacancies(params interfaces.SearchParams) ([]interfaces.Vacancy, error) {
+func (p *SuperJobParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy, error) {
 	apiURL, err := p.buildURL(params)
 	if err != nil {
 		return nil, fmt.Errorf("build URL failed: %w", err)
@@ -72,7 +72,7 @@ func (p *SuperJobParser) SearchVacancies(params interfaces.SearchParams) ([]inte
 	return p.convertToUniversal(sjResponse.Items), nil
 }
 
-func (p *SuperJobParser) buildURL(params interfaces.SearchParams) (string, error) {
+func (p *SuperJobParser) buildURL(params models.SearchParams) (string, error) {
 	u, err := url.Parse(p.baseURL)
 	if err != nil {
 		return "", err
@@ -109,11 +109,11 @@ func (p *SuperJobParser) convertArea(area string) string {
 	return ""
 }
 
-func (p *SuperJobParser) convertToUniversal(sjVacancies []model.SJVacancy) []interfaces.Vacancy {
-	vacancies := make([]interfaces.Vacancy, len(sjVacancies))
+func (p *SuperJobParser) convertToUniversal(sjVacancies []model.SJVacancy) []models.Vacancy {
+	vacancies := make([]models.Vacancy, len(sjVacancies))
 	for i, sjv := range sjVacancies {
 		salary := sjv.GetSalaryString()
-		vacancies[i] = interfaces.Vacancy{
+		vacancies[i] = models.Vacancy{
 			ID:       strconv.Itoa(sjv.ID),
 			Job:      sjv.Profession,
 			Company:  sjv.FirmName,

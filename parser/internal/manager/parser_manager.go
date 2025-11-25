@@ -3,8 +3,12 @@ package manager
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"parser/configs"
+	"parser/internal/domain/models"
 	"parser/internal/interfaces"
 	"strconv"
 	"strings"
@@ -26,19 +30,11 @@ func NewParserManager(config *configs.Config, parsers ...interfaces.Parser) *Par
 	}
 }
 
-// Структура для определния результатов поиска
-type SearchResult struct {
-	ParserName string
-	Vacancies  []interfaces.Vacancy
-	Error      error
-	Duration   time.Duration
-}
-
 // Метод для мульти-поиска
 func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
-	var params interfaces.SearchParams
+	var params models.SearchParams
 
 	fmt.Print("Введите поисковый запрос: ")
 	if scanner.Scan() {
@@ -59,6 +55,8 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 		params.PerPage = 20
 	}
 
+	searchHash, _ := GenHashFromSearchParam(params)
+	fmt.Println("Сформированный хэш:", searchHash)
 	fmt.Println("⏳ Ищем вакансии во всех источниках...")
 
 	ctx := context.Background()
@@ -72,13 +70,13 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 }
 
 // concurrentSearchWithTimeout выполняет поиск во всех парсерах одновременно с таймаутом
-func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, params interfaces.SearchParams, timeout time.Duration) ([]SearchResult, error) {
+func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, params models.SearchParams, timeout time.Duration) ([]models.SearchResult, error) {
 	// создаём контекст с таймаутом
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var wg sync.WaitGroup
-	results := make(chan SearchResult, len(pm.parsers))
+	results := make(chan models.SearchResult, len(pm.parsers))
 
 	for _, parser := range pm.parsers {
 		wg.Add(1)
@@ -87,14 +85,14 @@ func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, params
 
 			// Создаем канал для результата и создаём ещё одну горутину, где производим поиск
 			// 2я - горутина нужна, чтобы потом использовать select и контролировать отмену контекста
-			resultChan := make(chan SearchResult, 1)
+			resultChan := make(chan models.SearchResult, 1)
 
 			go func() {
 				start := time.Now()
 				vacancies, err := p.SearchVacancies(params)
 				duration := time.Since(start)
 
-				resultChan <- SearchResult{
+				resultChan <- models.SearchResult{
 					ParserName: p.GetName(),
 					Vacancies:  vacancies,
 					Error:      err,
@@ -105,7 +103,7 @@ func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, params
 			select {
 			case <-ctx.Done():
 				// Таймаут или отмена
-				results <- SearchResult{
+				results <- models.SearchResult{
 					ParserName: p.GetName(),
 					Error:      fmt.Errorf("timeout exceeded"),
 				}
@@ -122,7 +120,7 @@ func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, params
 	}()
 
 	// обьявляем переменную для выходных данных
-	var searchResults []SearchResult
+	var searchResults []models.SearchResult
 
 	for result := range results {
 		searchResults = append(searchResults, result)
@@ -141,7 +139,7 @@ func (pm *ParserManager) GetParserNames() []string {
 }
 
 // Метод для вывода в консоль результатов поиска (с нужными атрибутами)
-func (pm *ParserManager) printMultiSearchResults(results []SearchResult, resultsPerPage int) {
+func (pm *ParserManager) printMultiSearchResults(results []models.SearchResult, resultsPerPage int) {
 	totalVacancies := 0
 
 	for _, result := range results {
@@ -170,4 +168,28 @@ func (pm *ParserManager) printMultiSearchResults(results []SearchResult, results
 	}
 
 	fmt.Printf("\n🎯 Всего найдено: %d вакансий\n", totalVacancies)
+}
+
+// функция генерирует хэш запроса поиска, чтобы кэшировать запросы по этому хэшу
+func GenHashFromSearchParam(params models.SearchParams) (string, error) {
+	// Учитываем ВСЕ параметры, которые влияют на результат
+	keyData := struct {
+		Text    string `json:"text"`
+		Area    string `json:"area"`
+		PerPage int    `json:"per_page"`
+		Page    int    `json:"page"`
+		// Добавьте другие поля из SearchParams
+	}{
+		Text:    params.Text,
+		Area:    params.Area,
+		PerPage: params.PerPage,
+		Page:    params.Page,
+	}
+
+	data, err := json.Marshal(keyData)
+	if err != nil {
+		return "", fmt.Errorf("Error while marshaling of params: %w\n", err)
+	}
+	hash := sha256.Sum256(data)
+	return fmt.Sprintf("%s", hex.EncodeToString(hash[:16])), nil
 }

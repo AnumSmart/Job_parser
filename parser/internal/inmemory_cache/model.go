@@ -1,7 +1,7 @@
-package cache
+package inmemory_cache
 
 import (
-	"parser/internal/manager"
+	"parser/internal/domain/models"
 	"sync"
 	"time"
 )
@@ -23,6 +23,6 @@ type Shard struct {
 
 // структура отдельного элемента inmemory cache
 type CashItem struct {
-	value   []manager.SearchResult
+	value   []models.SearchResult
 	expTime time.Time
 }

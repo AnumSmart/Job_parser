@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+const (
+	numOfShards = 7
+)
+
 func main() {
 	fmt.Println("🚀 Multi-Source Vacancy Parser запущен!")
 	fmt.Println("==========================")
@@ -22,6 +26,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	//создаём экземпляр inmemory cache
+	//cacheSh := inmemory_cache.NewInmemoryShardedCache(numOfShards, time.Minute)
 
 	// Создаём парсеры
 	hhParser := parser.NewHHParser()

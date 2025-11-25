@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"parser/internal/interfaces"
+	"parser/internal/domain/models"
 	"parser/internal/model"
 
 	"net/http"
@@ -30,7 +30,7 @@ func NewHHParser() *HHParser {
 	}
 }
 
-func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]interfaces.Vacancy, error) {
+func (p *HHParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy, error) {
 	// Строим URL с параметрами
 	apiURL, err := p.buildURL(params)
 	if err != nil {
@@ -67,15 +67,15 @@ func (p *HHParser) SearchVacancies(params interfaces.SearchParams) ([]interfaces
 }
 
 // Приводит структуры найденных результатов к универсальной структуре для всех парсеров
-func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []interfaces.Vacancy {
+func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []models.Vacancy {
 	// сразу инициализируем слайс универсальных вакансий, чтобы уменьшить количество переаалокаций, если выйдем за размер базового массива слайса
-	universalVacancies := make([]interfaces.Vacancy, len(hhVavancies))
+	universalVacancies := make([]models.Vacancy, len(hhVavancies))
 
 	for i, hhvacancy := range hhVavancies {
 		// получаем строку-описания вилки зарплаты для каждой найденной записи
 		salary := hhvacancy.GetSalaryString()
 
-		universalVacancies[i] = interfaces.Vacancy{
+		universalVacancies[i] = models.Vacancy{
 			ID:       hhvacancy.ID,
 			Job:      hhvacancy.Name,
 			Company:  hhvacancy.Employer.Name,
@@ -90,7 +90,7 @@ func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []interface
 }
 
 // buildURL строит URL для API запроса
-func (p *HHParser) buildURL(params interfaces.SearchParams) (string, error) {
+func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
 	u, err := url.Parse(p.baseURL)
 	if err != nil {
 		return "", err
