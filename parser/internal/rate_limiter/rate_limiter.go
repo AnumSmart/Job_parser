@@ -3,6 +3,7 @@ package ratelimiter
 import (
 	"context"
 	"errors"
+	"parser/internal/interfaces"
 	"sync"
 	"time"
 )
@@ -100,3 +101,6 @@ func (rl *ChannelRateLimiter) Stop() {
 		close(rl.limiter) // закрываем канал
 	}
 }
+
+// Проверка на этапе компиляции, что тип реализует интерфейс
+var _ interfaces.RateLimiter = (*ChannelRateLimiter)(nil)

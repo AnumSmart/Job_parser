@@ -1,5 +1,6 @@
 package interfaces
 
 type RateLimiter interface {
-	Wait()
+	Wait() error
+	Stop()
 }

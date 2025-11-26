@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"parser/internal/domain/models"
+	"parser/internal/interfaces"
 	"parser/internal/model"
+	ratelimiter "parser/internal/rate_limiter"
 
 	"net/http"
 	"net/url"
@@ -14,19 +16,26 @@ import (
 	"time"
 )
 
+const (
+	hhRateLimit = 2 * time.Second
+)
+
 // HHParser представляет парсер для HH.ru API
 type HHParser struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL       string
+	httpClient    *http.Client
+	hhRateLimiter interfaces.RateLimiter
 }
 
 // NewHHParser создаёт новый экземпляр парсера (конструктор для парсера)
 func NewHHParser() *HHParser {
+
 	return &HHParser{
 		baseURL: "https://api.hh.ru/vacancies",
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		hhRateLimiter: ratelimiter.NewChannelRateLimiter(hhRateLimit),
 	}
 }
 
@@ -38,6 +47,9 @@ func (p *HHParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy
 	}
 
 	fmt.Printf("Created URL with params: %s\n", apiURL)
+
+	// вызываем метод rate limiter до обращения к внешнему сервису
+	p.hhRateLimiter.Wait()
 
 	// Выполняем HTTP запрос
 	resp, err := p.httpClient.Get(apiURL)
