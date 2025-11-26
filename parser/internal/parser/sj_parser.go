@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"job_parser/internal/domain/models"
+	"job_parser/internal/interfaces"
 	"job_parser/internal/model"
+	ratelimiter "job_parser/internal/rate_limiter"
 	"net/http"
 	"net/url"
 
