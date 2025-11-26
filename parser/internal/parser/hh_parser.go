@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"parser/internal/domain/models"
-	"parser/internal/interfaces"
-	"parser/internal/model"
-	ratelimiter "parser/internal/rate_limiter"
+	"job_parser/internal/domain/models"
+	"job_parser/internal/model"
 
 	"net/http"
 	"net/url"

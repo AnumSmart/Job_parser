@@ -16,7 +16,7 @@ type apiConfig struct {
 }
 
 func LoadConfig() (*Config, error) {
-	err := godotenv.Load("c:\\Users\\aliaksei.makarevich\\go\\Job_Parser\\parser\\.env")
+	err := godotenv.Load("c:\\Son_Alex\\Go_projects\\go_v_1_23\\Job_Parser\\parser\\.env")
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}

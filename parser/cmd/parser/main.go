@@ -3,11 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"parser/configs"
-	"parser/internal/inmemory_cache"
-	"parser/internal/manager"
-	"parser/internal/model"
-	"parser/internal/parser"
+	"job_parser/configs"
+	"job_parser/internal/inmemory_cache"
+	"job_parser/internal/manager"
+	"job_parser/internal/model"
+	"job_parser/internal/parser"
 
 	"os"
 	"strings"

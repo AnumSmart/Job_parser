@@ -3,8 +3,8 @@ package inmemory_cache
 import (
 	"fmt"
 	"hash/fnv"
+	"job_parser/internal/domain/models"
 	"log"
-	"parser/internal/domain/models"
 	"time"
 )
 

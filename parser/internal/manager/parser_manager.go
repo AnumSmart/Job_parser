@@ -7,10 +7,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"parser/configs"
-	"parser/internal/domain/models"
-	"parser/internal/inmemory_cache"
-	"parser/internal/interfaces"
+	"job_parser/configs"
+	"job_parser/internal/domain/models"
+	"job_parser/internal/inmemory_cache"
+	"job_parser/internal/interfaces"
+
 	"strconv"
 	"strings"
 
