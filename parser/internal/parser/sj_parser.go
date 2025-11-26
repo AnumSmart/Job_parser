@@ -13,10 +13,15 @@ import (
 	"time"
 )
 
+const (
+	sjRateLimit = 2 * time.Second
+)
+
 type SuperJobParser struct {
-	baseURL    string
-	apiKey     string
-	httpClient *http.Client
+	baseURL       string
+	apiKey        string
+	httpClient    *http.Client
+	sjRateLimiter interfaces.RateLimiter
 }
 
 func NewSuperJobParser(apiKey string) *SuperJobParser {
@@ -26,6 +31,7 @@ func NewSuperJobParser(apiKey string) *SuperJobParser {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		sjRateLimiter: ratelimiter.NewChannelRateLimiter(sjRateLimit),
 	}
 }
 
@@ -48,6 +54,10 @@ func (p *SuperJobParser) SearchVacancies(params models.SearchParams) ([]models.V
 	req.Header.Add("X-Api-App-Id", p.apiKey)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
+	// вызываем метод rate limiter до обращения к внешнему сервису
+	p.sjRateLimiter.Wait()
+
+	// Выполняем HTTP запрос
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
