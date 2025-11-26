@@ -2,6 +2,7 @@ package models
 
 import "time"
 
+// общая структура поиска
 type SearchParams struct {
 	Text    string
 	Area    string
@@ -9,6 +10,7 @@ type SearchParams struct {
 	Page    int
 }
 
+// Стуктура общей вакансии для всех ответов
 type Vacancy struct {
 	ID          string
 	Job         string
