@@ -42,7 +42,7 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 	// пытаемся найти в кэше данные по заданному хэш ключу
 	fmt.Println("⏳ Ищем вакансии в кэше...")
 
-	searchRes, ok := pm.cache.GetItem(searchHash)
+	searchRes, ok := pm.searchCache.GetItem(searchHash)
 	if ok {
 		// если можно получить данные из кэша, то получаем интерфейс.
 		// проводим type assertion, проверяем нужный тип
@@ -72,7 +72,7 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 	}
 
 	//записываем данные в кэш
-	pm.cache.AddItemWithTTL(searchHash, results, time.Minute)
+	pm.searchCache.AddItemWithTTL(searchHash, results, time.Minute)
 
 	// вызываем функцию вывода в консоль информации о результатах поиска
 	pm.printMultiSearchResults(results, params.PerPage)

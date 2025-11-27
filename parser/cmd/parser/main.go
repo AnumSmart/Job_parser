@@ -14,7 +14,9 @@ import (
 )
 
 const (
-	numOfShards = 7
+	numOfShards     = 7
+	searchCacheTTL  = 10 * time.Minute
+	vacancyCacheTTL = 60 * time.Minute
 )
 
 func main() {
@@ -27,15 +29,18 @@ func main() {
 		panic(err)
 	}
 
-	//создаём экземпляр inmemory cache
-	cacheSh := inmemory_cache.NewInmemoryShardedCache(numOfShards, 10*time.Minute)
+	//создаём экземпляр inmemory cache для результатов поиска вакансий
+	searchCache := inmemory_cache.NewInmemoryShardedCache(numOfShards, searchCacheTTL)
+
+	//создаём экземпляр inmemory cache для обратного индекса для вакансий
+	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(numOfShards, vacancyCacheTTL)
 
 	// Создаём парсеры
 	hhParser := parser.NewHHParser()
 	sjParser := parser.NewSuperJobParser(conf.Api_conf.SJAPIKey)
 
 	// Создаём менеджер парсеров
-	parserManager := manager.NewParserManager(conf, cacheSh, hhParser, sjParser)
+	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, hhParser, sjParser)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)
