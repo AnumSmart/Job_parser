@@ -33,7 +33,7 @@ func main() {
 
 	// Создаём парсеры
 	hhParser := parser.NewHHParser()
-	sjParser := parser.NewSuperJobParser(conf.Api_conf.SJ_api_key)
+	sjParser := parser.NewSuperJobParser(conf.Api_conf.SJAPIKey)
 
 	// Создаём менеджер парсеров
 	parserManager := manager.NewParserManager(conf, hhParser, sjParser)
@@ -70,7 +70,7 @@ func main() {
 func printMenu() {
 	fmt.Println("📋 Меню:")
 	fmt.Println("1. Поиск вакансий (расширенный)")
-	fmt.Println("2. Получить детали вакансии по ID")
+	fmt.Println("2. Получить детали вакансии по ID ")
 	fmt.Println("3. Выход")
 }
 

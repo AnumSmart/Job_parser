@@ -12,7 +12,8 @@ type Config struct {
 }
 
 type apiConfig struct {
-	SJ_api_key string
+	SJAPIKey             string
+	ConcSearchCtxTimeOut string
 }
 
 func LoadConfig() (*Config, error) {
@@ -22,7 +23,8 @@ func LoadConfig() (*Config, error) {
 	}
 	return &Config{
 		Api_conf: apiConfig{
-			SJ_api_key: os.Getenv("SJ_API_KEY"),
+			SJAPIKey:             os.Getenv("SJ_API_KEY"),
+			ConcSearchCtxTimeOut: os.Getenv("CONC_SEARCH_TIMEOUT"),
 		},
 	}, nil
 }

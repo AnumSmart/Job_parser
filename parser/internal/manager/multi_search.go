@@ -11,10 +11,6 @@ import (
 	"time"
 )
 
-const (
-	ctxTimeout = 2 * time.Second
-)
-
 // Метод для мульти-поиска
 func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner, cash *inmemory_cache.InmemoryShardedCache) {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
@@ -55,8 +51,14 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner, cash *inmemory_cach
 	fmt.Println("⏳ Не удалось найти данные в кэше! Ищем вакансии во всех источниках...")
 
 	ctx := context.Background()
-	// Запускаем конкурентный поиск по всем источникам, таймаут для отмены контекста в переменной ctxTimeout
-	results, err := pm.concurrentSearchWithTimeout(ctx, searchHash, params, ctxTimeout)
+	// Запускаем конкурентный поиск по всем источникам, таймаут для отмены контекста получаем из .env
+	ctxTimeout, err := strconv.Atoi(pm.config.Api_conf.ConcSearchCtxTimeOut)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	results, err := pm.concurrentSearchWithTimeout(ctx, searchHash, params, time.Duration(ctxTimeout)*time.Second)
 	if err != nil {
 		fmt.Printf("❌ Ошибка при поиске: %v\n", err)
 		return
