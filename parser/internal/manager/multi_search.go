@@ -5,14 +5,13 @@ import (
 	"context"
 	"fmt"
 	"parser/internal/domain/models"
-	"parser/internal/inmemory_cache"
 	"strconv"
 	"strings"
 	"time"
 )
 
 // Метод для мульти-поиска
-func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner, cash *inmemory_cache.InmemoryShardedCache) {
+func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
 	var params models.SearchParams
@@ -42,9 +41,17 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner, cash *inmemory_cach
 
 	// пытаемся найти в кэше данные по заданному хэш ключу
 	fmt.Println("⏳ Ищем вакансии в кэше...")
-	searchRes, ok := cash.GetItem(searchHash)
+
+	searchRes, ok := pm.cache.GetItem(searchHash)
 	if ok {
-		pm.printMultiSearchResults(searchRes, params.PerPage)
+		// если можно получить данные из кэша, то получаем интерфейс.
+		// проводим type assertion, проверяем нужный тип
+		searchResChecked, ok := searchRes.([]models.SearchResult)
+		if !ok {
+			fmt.Println("Type assertion after multi-search ---> failed!")
+			return
+		}
+		pm.printMultiSearchResults(searchResChecked, params.PerPage)
 		return
 	}
 
@@ -65,7 +72,7 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner, cash *inmemory_cach
 	}
 
 	//записываем данные в кэш
-	cash.AddItemWithTTL(searchHash, results, time.Minute)
+	pm.cache.AddItemWithTTL(searchHash, results, time.Minute)
 
 	// вызываем функцию вывода в консоль информации о результатах поиска
 	pm.printMultiSearchResults(results, params.PerPage)
