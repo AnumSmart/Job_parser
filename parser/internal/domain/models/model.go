@@ -28,6 +28,7 @@ type Vacancy struct {
 // Структура для определния результатов поиска
 type SearchResult struct {
 	ParserName string
+	SearchHash string
 	Vacancies  []Vacancy
 	Error      error
 	Duration   time.Duration

@@ -46,8 +46,6 @@ func (p *HHParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy
 		return nil, fmt.Errorf("build URL failed: %w", err)
 	}
 
-	fmt.Printf("Created URL with params: %s\n", apiURL)
-
 	// вызываем метод rate limiter до обращения к внешнему сервису
 	p.hhRateLimiter.Wait()
 
