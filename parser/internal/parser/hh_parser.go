@@ -46,8 +46,6 @@ func (p *HHParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy
 		return nil, fmt.Errorf("build URL failed: %w", err)
 	}
 
-	fmt.Printf("Created URL with params: %s\n", apiURL)
-
 	// вызываем метод rate limiter до обращения к внешнему сервису
 	p.hhRateLimiter.Wait()
 
@@ -88,14 +86,15 @@ func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []models.Va
 		salary := hhvacancy.GetSalaryString()
 
 		universalVacancies[i] = models.Vacancy{
-			ID:       hhvacancy.ID,
-			Job:      hhvacancy.Name,
-			Company:  hhvacancy.Employer.Name,
-			Currency: hhvacancy.Salary.Currency,
-			Salary:   &salary,
-			Area:     hhvacancy.Area.Name,
-			URL:      hhvacancy.URL,
-			Seeker:   p.GetName(),
+			ID:          hhvacancy.ID,
+			Job:         hhvacancy.Name,
+			Company:     hhvacancy.Employer.Name,
+			Currency:    hhvacancy.Salary.Currency,
+			Salary:      &salary,
+			Area:        hhvacancy.Area.Name,
+			URL:         hhvacancy.URL,
+			Seeker:      p.GetName(),
+			Description: hhvacancy.Description,
 		}
 	}
 	return universalVacancies

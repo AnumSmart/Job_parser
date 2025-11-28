@@ -35,7 +35,7 @@ func NewInmemoryShardedCache(numShards int, TTL time.Duration) *InmemoryShardedC
 // чтобы реализовать этот метод - нужна функция, которая будет находить нужный шард по заданному ключу (внутри будет хэш-функция)
 // результатом будет значение в CashItem и флаг
 
-func (c *InmemoryShardedCache) GetItem(key string) ([]models.SearchResult, bool) {
+func (c *InmemoryShardedCache) GetItem(key string) (interface{}, bool) {
 	// получаем необходимый шард
 	shard := c.GetShard(key)
 	now := time.Now()
@@ -52,6 +52,7 @@ func (c *InmemoryShardedCache) GetItem(key string) ([]models.SearchResult, bool)
 		fmt.Printf("Data in cache with key:%s are not valid\n", key)
 		return nil, false
 	}
+
 	return val.value, true
 }
 
@@ -73,7 +74,7 @@ func (c *InmemoryShardedCache) GetShard(key string) *Shard {
 }
 
 // метод, чтобы записать значение в кэш с заданным TTL
-func (c *InmemoryShardedCache) AddItemWithTTL(key string, value []models.SearchResult, ttl time.Duration) {
+func (c *InmemoryShardedCache) AddItemWithTTL(key string, value interface{}, ttl time.Duration) {
 	// получаем необходимый шард
 	shard := c.GetShard(key)
 	now := time.Now()
@@ -84,5 +85,18 @@ func (c *InmemoryShardedCache) AddItemWithTTL(key string, value []models.SearchR
 	shard.Items[key] = CashItem{
 		value:   value,
 		expTime: now.Add(ttl), // время жизни для нового занчения - высчитывавем: время на момоент вызова функции + ttl
+	}
+}
+
+// метод удаления элемента из кэша по ключу
+func (c *InmemoryShardedCache) DeleteItem(key string) {
+	for _, shard := range c.shards {
+		shard.mu.Lock()
+		for key := range shard.Items {
+			if key == key {
+				delete(shard.Items, key)
+			}
+		}
+		shard.mu.Unlock()
 	}
 }

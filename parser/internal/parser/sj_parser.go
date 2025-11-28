@@ -38,7 +38,7 @@ func NewSuperJobParser(apiKey string) *SuperJobParser {
 }
 
 func (p *SuperJobParser) GetName() string {
-	return "SuperJob"
+	return "SuperJob.ru"
 }
 
 func (p *SuperJobParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy, error) {
@@ -126,14 +126,15 @@ func (p *SuperJobParser) convertToUniversal(sjVacancies []model.SJVacancy) []mod
 	for i, sjv := range sjVacancies {
 		salary := sjv.GetSalaryString()
 		vacancies[i] = models.Vacancy{
-			ID:       strconv.Itoa(sjv.ID),
-			Job:      sjv.Profession,
-			Company:  sjv.FirmName,
-			Currency: sjv.Currency,
-			Salary:   &salary,
-			Area:     sjv.Town.Title,
-			URL:      sjv.Link,
-			Seeker:   p.GetName(),
+			ID:          strconv.Itoa(sjv.ID),
+			Job:         sjv.Profession,
+			Company:     sjv.FirmName,
+			Currency:    sjv.Currency,
+			Salary:      &salary,
+			Area:        sjv.Town.Title,
+			URL:         sjv.Link,
+			Seeker:      p.GetName(),
+			Description: sjv.VacancyRichText,
 		}
 	}
 	return vacancies

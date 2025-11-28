@@ -3,11 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"job_parser/configs"
-	"job_parser/internal/inmemory_cache"
-	"job_parser/internal/manager"
-	"job_parser/internal/model"
-	"job_parser/internal/parser"
+	"parser/configs"
+	"parser/internal/inmemory_cache"
+	"parser/internal/manager"
+	"parser/internal/parser"
 
 	"os"
 	"strings"
@@ -15,7 +14,9 @@ import (
 )
 
 const (
-	numOfShards = 7
+	numOfShards     = 7
+	searchCacheTTL  = 10 * time.Minute
+	vacancyCacheTTL = 60 * time.Minute
 )
 
 func main() {
@@ -28,15 +29,18 @@ func main() {
 		panic(err)
 	}
 
-	//создаём экземпляр inmemory cache
-	cacheSh := inmemory_cache.NewInmemoryShardedCache(numOfShards, time.Minute)
+	//создаём экземпляр inmemory cache для результатов поиска вакансий
+	searchCache := inmemory_cache.NewInmemoryShardedCache(numOfShards, searchCacheTTL)
+
+	//создаём экземпляр inmemory cache для обратного индекса для вакансий
+	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(numOfShards, vacancyCacheTTL)
 
 	// Создаём парсеры
 	hhParser := parser.NewHHParser()
-	sjParser := parser.NewSuperJobParser(conf.Api_conf.SJ_api_key)
+	sjParser := parser.NewSuperJobParser(conf.Api_conf.SJAPIKey)
 
 	// Создаём менеджер парсеров
-	parserManager := manager.NewParserManager(conf, hhParser, sjParser)
+	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, hhParser, sjParser)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)
@@ -53,9 +57,17 @@ func main() {
 
 		switch choice {
 		case "1":
-			parserManager.MultiSearch(scanner, cacheSh)
+			err := parserManager.MultiSearch(scanner)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		case "2":
-			getVacancyDetails(hhParser, scanner)
+			err := parserManager.GetVacancyDetails(scanner)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		case "3":
 			fmt.Println("👋 До свидания!")
 			return
@@ -70,104 +82,6 @@ func main() {
 func printMenu() {
 	fmt.Println("📋 Меню:")
 	fmt.Println("1. Поиск вакансий (расширенный)")
-	fmt.Println("2. Получить детали вакансии по ID")
+	fmt.Println("2. Получить детали вакансии по ID ")
 	fmt.Println("3. Выход")
-}
-
-func getVacancyDetails(hhParser *parser.HHParser, scanner *bufio.Scanner) {
-	fmt.Println("\n📄 Детали вакансии")
-
-	fmt.Print("Введите ID вакансии: ")
-	if !scanner.Scan() {
-		return
-	}
-
-	vacancyID := strings.TrimSpace(scanner.Text())
-	if vacancyID == "" {
-		fmt.Println("❌ ID вакансии не может быть пустым")
-		return
-	}
-
-	fmt.Println("⏳ Загружаем информацию...")
-
-	vacancy, err := hhParser.GetVacancyByID(vacancyID)
-	if err != nil {
-		fmt.Printf("❌ Ошибка при загрузке вакансии: %v\n", err)
-		return
-	}
-
-	printVacancyDetails(vacancy)
-}
-
-func printVacancies(vacancies []model.HHVacancy) {
-	if len(vacancies) == 0 {
-		fmt.Println("😞 Вакансии не найдены")
-		return
-	}
-
-	for i, vacancy := range vacancies {
-		fmt.Printf("\n%d. %s\n", i+1, vacancy.Name)
-		fmt.Printf("   💼 %s\n", vacancy.Employer.Name)
-		fmt.Printf("   💰 %s\n", vacancy.GetSalaryString())
-		fmt.Printf("   📍 %s\n", vacancy.Area.Name)
-		//fmt.Printf("   🕐 %s\n", formatDate(vacancy.PublishedAt))
-		fmt.Printf("   🔗 %s\n", vacancy.URL)
-		fmt.Printf("   🆔 %s\n", vacancy.ID)
-	}
-}
-
-func printVacancyDetails(vacancy *model.HHVacancy) {
-	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Printf("🏢 %s\n", vacancy.Name)
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("💼 Работодатель: %s\n", vacancy.Employer.Name)
-	fmt.Printf("💰 Зарплата: %s\n", vacancy.GetSalaryString())
-	fmt.Printf("📍 Местоположение: %s\n", vacancy.Area.Name)
-	//fmt.Printf("🕐 Опубликовано: %s\n", formatDate(vacancy.PublishedAt))
-	fmt.Printf("🔗 Ссылка: %s\n", vacancy.URL)
-	fmt.Printf("🆔 ID: %s\n", vacancy.ID)
-
-	// Обрезаем описание для читаемости
-	description := vacancy.Description
-	if len(description) > 500 {
-		description = description[:500] + "..."
-	}
-
-	if description != "" {
-		fmt.Println("\n📝 Описание:")
-		fmt.Println(cleanHTML(description))
-	}
-
-	fmt.Println(strings.Repeat("=", 50))
-}
-
-func formatDate(t time.Time) string {
-	return t.Format("02.01.2006 15:04")
-}
-
-func cleanHTML(text string) string {
-	// Простая очистка HTML тегов
-	text = strings.ReplaceAll(text, "<p>", "\n")
-	text = strings.ReplaceAll(text, "<br>", "\n")
-	text = strings.ReplaceAll(text, "<li>", "• ")
-
-	// Удаляем HTML теги
-	var result strings.Builder
-	var inTag bool
-
-	for _, ch := range text {
-		if ch == '<' {
-			inTag = true
-			continue
-		}
-		if ch == '>' {
-			inTag = false
-			continue
-		}
-		if !inTag {
-			result.WriteRune(ch)
-		}
-	}
-
-	return strings.TrimSpace(result.String())
 }

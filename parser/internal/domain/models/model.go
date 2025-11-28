@@ -23,11 +23,13 @@ type Vacancy struct {
 	URL         string
 	PublishedAt time.Time
 	Seeker      string // "hh", "superjob"
+	Description string
 }
 
 // Структура для определния результатов поиска
 type SearchResult struct {
 	ParserName string
+	SearchHash string
 	Vacancies  []Vacancy
 	Error      error
 	Duration   time.Duration
