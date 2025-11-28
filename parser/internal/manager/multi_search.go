@@ -15,7 +15,7 @@ const (
 )
 
 // Метод для мульти-поиска
-func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
+func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) error {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
 	var params models.SearchParams
@@ -40,47 +40,14 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 	if params.PerPage == 0 {
 		params.PerPage = 20
 	}
-
-	searchHash, _ := genHashFromSearchParam(params) // ****!!!! нужно обработать ошибку
-
-	// пытаемся найти в кэше данные по заданному хэш ключу
-	fmt.Println("⏳ Ищем вакансии в кэше...")
-
-	searchRes, ok := pm.searchCache.GetItem(searchHash)
-	if ok {
-		// если можно получить данные из кэша, то получаем интерфейс.
-		// проводим type assertion, проверяем нужный тип
-		searchResChecked, ok := searchRes.([]models.SearchResult)
-		if !ok {
-			fmt.Println("Type assertion after multi-search ---> failed!")
-			return
-		}
-		pm.printMultiSearchResults(searchResChecked, params.PerPage)
-		return
-	}
-
-	fmt.Println("⏳ Не удалось найти данные в кэше! Ищем вакансии во всех источниках...")
-
 	ctx := context.Background()
-	// Запускаем конкурентный поиск по всем источникам, таймаут для отмены контекста получаем из .env
-	ctxTimeout, err := strconv.Atoi(pm.config.Api_conf.ConcSearchCtxTimeOut)
+
+	results, err := pm.search(ctx, params)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
-
-	results, err := pm.concurrentSearchWithTimeout(ctx, searchHash, params, time.Duration(ctxTimeout)*time.Second)
-	if err != nil {
-		fmt.Printf("❌ Ошибка при поиске: %v\n", err)
-		return
-	}
-
-	//записываем данные в поисковый кэш
-	pm.searchCache.AddItemWithTTL(searchHash, results, cacheTTL)
-
-	// Строим обратный индекс и сразу кэшируем его в кэше [index]models.VacanvyIndex
-	pm.buildReverseIndex(searchHash, results)
 
 	// вызываем функцию вывода в консоль информации о результатах поиска
 	pm.printMultiSearchResults(results, params.PerPage)
+	return nil
 }

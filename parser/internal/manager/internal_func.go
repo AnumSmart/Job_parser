@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -105,6 +106,24 @@ func (pm *ParserManager) printMultiSearchResults(results []models.SearchResult, 
 	fmt.Printf("\n🎯 Всего найдено: %d вакансий\n", totalVacancies)
 }
 
+// метод для построения обратного индекса и хранения его в кэше для индексов и ID вакансий
+func (pm *ParserManager) buildReverseIndex(searchHash string, results []models.SearchResult) {
+	for _, parserResult := range results {
+		for i, vacancy := range parserResult.Vacancies {
+			compositeID := fmt.Sprintf("%s_%s", vacancy.Seeker, vacancy.ID)
+
+			indexEntry := models.VacancyIndex{
+				SearchHash: searchHash,
+				ParserName: parserResult.ParserName,
+				Index:      i,
+			}
+
+			// Сохраняем в индексный кэш (ТОТ ЖЕ ТИП!), TTL такой же как для кэша поиска
+			pm.vacancyIndex.AddItemWithTTL(compositeID, indexEntry, cacheTTL)
+		}
+	}
+}
+
 // функция генерирует хэш запроса поиска, чтобы кэшировать запросы по этому хэшу
 func genHashFromSearchParam(params models.SearchParams) (string, error) {
 	// Учитываем ВСЕ параметры, которые влияют на результат
@@ -129,20 +148,45 @@ func genHashFromSearchParam(params models.SearchParams) (string, error) {
 	return fmt.Sprintf("%s", hex.EncodeToString(hash[:16])), nil
 }
 
-// метод для построения обратного индекса и хранения его в кэше для индексов и ID вакансий
-func (pm *ParserManager) buildReverseIndex(searchHash string, results []models.SearchResult) {
-	for _, parserResult := range results {
-		for i, vacancy := range parserResult.Vacancies {
-			compositeID := fmt.Sprintf("%s_%s", vacancy.Seeker, vacancy.ID)
+func (pm *ParserManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
+	// Запускаем конкурентный поиск по всем источникам, таймаут для отмены контекста получаем из .env
+	ctxTimeout, err := strconv.Atoi(pm.config.Api_conf.ConcSearchCtxTimeOut)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ctxTimeOut from .env : %v\n", err)
+	}
 
-			indexEntry := models.VacancyIndex{
-				SearchHash: searchHash,
-				ParserName: parserResult.ParserName,
-				Index:      i,
-			}
+	// получаем хэш для поиска
+	searchHash, err := genHashFromSearchParam(params)
+	if err != nil {
+		return nil, fmt.Errorf("❌ Ошибка при генерации поискового хэша: %v\n", err)
+	}
+	// ---------------------------------------------------------------------------------------------------------------
+	// пытаемся найти в кэше данные по заданному хэш ключу
+	fmt.Println("⏳ Ищем вакансии в кэше...")
 
-			// Сохраняем в индексный кэш (ТОТ ЖЕ ТИП!), TTL такой же как для кэша поиска
-			pm.vacancyIndex.AddItemWithTTL(compositeID, indexEntry, cacheTTL)
+	searchRes, ok := pm.searchCache.GetItem(searchHash)
+	if ok {
+		// если можно получить данные из кэша, то получаем интерфейс.
+		// проводим type assertion, проверяем нужный тип
+		searchResChecked, ok := searchRes.([]models.SearchResult)
+		if !ok {
+			fmt.Println("Type assertion after multi-search ---> failed!")
+			return nil, fmt.Errorf("❌ Type assertion getting data from search cache ---> failed!\n")
 		}
+		return searchResChecked, nil
+	} else {
+		fmt.Println("⏳ Не удалось найти данные в кэше! Ищем вакансии во всех источниках...")
+		results, err := pm.concurrentSearchWithTimeout(ctx, searchHash, params, time.Duration(ctxTimeout)*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("❌ Ошибка при конкурентном поиске данных во внешних источниках: %v\n", err)
+		}
+
+		//записываем данные в поисковый кэш
+		pm.searchCache.AddItemWithTTL(searchHash, results, cacheTTL)
+
+		// Строим обратный индекс и сразу кэшируем его в кэше [index]models.VacanvyIndex
+		pm.buildReverseIndex(searchHash, results)
+
+		return results, nil
 	}
 }

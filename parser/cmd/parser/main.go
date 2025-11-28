@@ -57,7 +57,11 @@ func main() {
 
 		switch choice {
 		case "1":
-			parserManager.MultiSearch(scanner)
+			err := parserManager.MultiSearch(scanner)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		case "2":
 			err := parserManager.GetVacancyDetails(scanner)
 			if err != nil {
