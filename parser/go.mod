@@ -1,4 +1,4 @@
-module job_parser
+module parser
 
 go 1.23.1
 

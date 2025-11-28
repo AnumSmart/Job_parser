@@ -3,7 +3,7 @@ package ratelimiter
 import (
 	"context"
 	"errors"
-	"job_parser/internal/interfaces"
+	"parser/internal/interfaces"
 	"sync"
 	"time"
 )
