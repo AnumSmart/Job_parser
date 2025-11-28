@@ -35,7 +35,7 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	fmt.Println("⏳ Загружаем информацию...")
 
 	// -------------------------------------------------------------------
-	// пытаемся найти в кэше данные по заданному хэш ключу (составному индексу)
+	// пытаемся найти в кэше данные по заданному ключу (составному индексу)
 	searchResIndex, ok := pm.vacancyIndex.GetItem(compositeID)
 	if !ok {
 		//fmt.Printf("No Vacancy with ID:%s found in cache\n", vacancyID)
@@ -72,12 +72,17 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 				}
 			}
 		}
+	} else {
+		pm.vacancyIndex.DeleteItem(compositeID)
+		return fmt.Errorf("Search data --- expired!\n")
 	}
 
 	// !!!!!!!!!!!!!!!!!! падаем с паникой, если TTL кэша истекает, а мы обращаемся за данными к кэшу (к поисковому) ------- нужно исправить
 	// -------------------------------------------------------------------
 
 	printVacancyDetails(targetVacancy)
+
+	// -------------------------------------------------------------------
 	return nil
 }
 

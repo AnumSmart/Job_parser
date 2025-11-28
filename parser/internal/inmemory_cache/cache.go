@@ -86,3 +86,16 @@ func (c *InmemoryShardedCache) AddItemWithTTL(key string, value interface{}, ttl
 		expTime: now.Add(ttl), // время жизни для нового занчения - высчитывавем: время на момоент вызова функции + ttl
 	}
 }
+
+// метод удаления элемента из кэша по ключу
+func (c *InmemoryShardedCache) DeleteItem(key string) {
+	for _, shard := range c.shards {
+		shard.mu.Lock()
+		for key, _ := range shard.Items {
+			if key == key {
+				delete(shard.Items, key)
+			}
+		}
+		shard.mu.Unlock()
+	}
+}
