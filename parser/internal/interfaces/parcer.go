@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"parser/internal/domain/models"
+	"job_parser/internal/domain/models"
 )
 
 type Parser interface {
