@@ -30,6 +30,7 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 
 	compositeID := fmt.Sprintf("%s_%s", source, vacancyID)
 
+	// создаём переменную для искомой вакансии
 	var targetVacancy models.Vacancy
 
 	fmt.Println("⏳ Загружаем информацию...")
