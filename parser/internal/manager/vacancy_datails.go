@@ -3,7 +3,7 @@ package manager
 import (
 	"bufio"
 	"fmt"
-	"parser/internal/model"
+	"parser/internal/domain/models"
 	"strings"
 	"time"
 )
@@ -22,7 +22,7 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) {
 		return
 	}
 
-	fmt.Print("Введите источник (hh.ru/superjob.ru): ")
+	fmt.Print("Введите источник (HH.ru/SuperJob.ru): ")
 	if !scanner.Scan() {
 		return
 	}
@@ -30,54 +30,78 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) {
 
 	compositeID := fmt.Sprintf("%s_%s", source, vacancyID)
 
+	var targetVacancy models.Vacancy
+
 	fmt.Println("⏳ Загружаем информацию...")
 
 	// -------------------------------------------------------------------
-	// тут должна быть логика поиска вакансии через составной обратный индекс
-	// -------------------------------------------------------------------
-
-	printVacancyDetails(vacancy)
-}
-
-func printVacancies(vacancies []model.HHVacancy) {
-	if len(vacancies) == 0 {
-		fmt.Println("😞 Вакансии не найдены")
+	// пытаемся найти в кэше данные по заданному хэш ключу (составному индексу)
+	searchResIndex, ok := pm.vacancyIndex.GetItem(compositeID)
+	if !ok {
+		fmt.Printf("No Vacancy with ID:%s found in cache\n", vacancyID)
 		return
 	}
 
-	for i, vacancy := range vacancies {
-		fmt.Printf("\n%d. %s\n", i+1, vacancy.Name)
-		fmt.Printf("   💼 %s\n", vacancy.Employer.Name)
-		fmt.Printf("   💰 %s\n", vacancy.GetSalaryString())
-		fmt.Printf("   📍 %s\n", vacancy.Area.Name)
-		//fmt.Printf("   🕐 %s\n", formatDate(vacancy.PublishedAt))
-		fmt.Printf("   🔗 %s\n", vacancy.URL)
-		fmt.Printf("   🆔 %s\n", vacancy.ID)
+	// проводим type assertion, проверяем нужный тип
+	searchResIndexChecked, ok := searchResIndex.(models.VacancyIndex)
+	if !ok {
+		fmt.Println("Type assertion after GetVacancyDetails ---> failed!")
+		return
 	}
+
+	// теперь из полученного из кэша индексов индекса мы можем найти нужный хэш запроса,
+	// чтобы потом по этому хэшу из кэша поиска найти нужную вакансию по ID
+
+	// пытаемся найти в кэше данные по заданному хэш ключу
+	searchRes, ok := pm.searchCache.GetItem(searchResIndexChecked.SearchHash)
+	if ok {
+		// если можно получить данные из кэша, то получаем интерфейс.
+		// проводим type assertion, проверяем нужный тип
+		searchResChecked, ok := searchRes.([]models.SearchResult)
+		if !ok {
+			fmt.Println("Type assertion after multi-search ---> failed!")
+			return
+		}
+
+		for _, NeededElementRes := range searchResChecked {
+			if NeededElementRes.ParserName == source {
+				for _, vacancyRes := range NeededElementRes.Vacancies {
+					if vacancyRes.ID == vacancyID {
+						targetVacancy = vacancyRes
+					}
+				}
+			}
+		}
+	}
+
+	// -------------------------------------------------------------------
+
+	printVacancyDetails(targetVacancy)
 }
 
-func printVacancyDetails(vacancy *model.HHVacancy) {
+func printVacancyDetails(vacancy models.Vacancy) {
+
 	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Printf("🏢 %s\n", vacancy.Name)
+	fmt.Printf("🏢 %s\n", vacancy.Job)
 	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("💼 Работодатель: %s\n", vacancy.Employer.Name)
-	fmt.Printf("💰 Зарплата: %s\n", vacancy.GetSalaryString())
-	fmt.Printf("📍 Местоположение: %s\n", vacancy.Area.Name)
+	fmt.Printf("💼 Работодатель: %s\n", vacancy.Company)
+	fmt.Printf("💰 Зарплата: %s\n", *vacancy.Salary)
+	fmt.Printf("📍 Местоположение: %s\n", vacancy.Area)
 	//fmt.Printf("🕐 Опубликовано: %s\n", formatDate(vacancy.PublishedAt))
 	fmt.Printf("🔗 Ссылка: %s\n", vacancy.URL)
 	fmt.Printf("🆔 ID: %s\n", vacancy.ID)
 
 	// Обрезаем описание для читаемости
 	description := vacancy.Description
-	if len(description) > 500 {
-		description = description[:500] + "..."
+	if len(description) > 1000 {
+		description = description[:1000] + "..."
 	}
 
 	if description != "" {
 		fmt.Println("\n📝 Описание:")
-		fmt.Println(cleanHTML(description))
+		//fmt.Println(cleanHTML(description))
+		fmt.Println(description)
 	}
-
 	fmt.Println(strings.Repeat("=", 50))
 }
 

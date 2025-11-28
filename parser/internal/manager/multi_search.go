@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+const (
+	searchCashDataTTL = 10 * time.Minute // время жизни записей в кэше поиска
+)
+
 // Метод для мульти-поиска
 func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
@@ -71,8 +75,11 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) {
 		return
 	}
 
-	//записываем данные в кэш
-	pm.searchCache.AddItemWithTTL(searchHash, results, time.Minute)
+	//записываем данные в поисковый кэш
+	pm.searchCache.AddItemWithTTL(searchHash, results, searchCashDataTTL)
+
+	// Строим обратный индекс и сразу кэшируем его в кэше [index]models.VacanvyIndex
+	pm.buildReverseIndex(searchHash, results)
 
 	// вызываем функцию вывода в консоль информации о результатах поиска
 	pm.printMultiSearchResults(results, params.PerPage)

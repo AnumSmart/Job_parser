@@ -23,6 +23,7 @@ type Vacancy struct {
 	URL         string
 	PublishedAt time.Time
 	Seeker      string // "hh", "superjob"
+	Description string
 }
 
 // Структура для определния результатов поиска

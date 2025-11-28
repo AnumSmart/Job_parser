@@ -86,14 +86,15 @@ func (p *HHParser) ConvertToUniversal(hhVavancies []model.HHVacancy) []models.Va
 		salary := hhvacancy.GetSalaryString()
 
 		universalVacancies[i] = models.Vacancy{
-			ID:       hhvacancy.ID,
-			Job:      hhvacancy.Name,
-			Company:  hhvacancy.Employer.Name,
-			Currency: hhvacancy.Salary.Currency,
-			Salary:   &salary,
-			Area:     hhvacancy.Area.Name,
-			URL:      hhvacancy.URL,
-			Seeker:   p.GetName(),
+			ID:          hhvacancy.ID,
+			Job:         hhvacancy.Name,
+			Company:     hhvacancy.Employer.Name,
+			Currency:    hhvacancy.Salary.Currency,
+			Salary:      &salary,
+			Area:        hhvacancy.Area.Name,
+			URL:         hhvacancy.URL,
+			Seeker:      p.GetName(),
+			Description: hhvacancy.Description,
 		}
 	}
 	return universalVacancies

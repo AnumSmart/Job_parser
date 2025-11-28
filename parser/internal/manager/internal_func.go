@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+const (
+	vacancyIndexCashDataTTL = 10 * time.Minute // время жизни записей в кэше поиска
+)
+
 // concurrentSearchWithTimeout выполняет поиск во всех парсерах одновременно с таймаутом
 func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, searchHash string, params models.SearchParams, timeout time.Duration) ([]models.SearchResult, error) {
 	// создаём контекст с таймаутом
@@ -127,4 +131,22 @@ func genHashFromSearchParam(params models.SearchParams) (string, error) {
 	}
 	hash := sha256.Sum256(data)
 	return fmt.Sprintf("%s", hex.EncodeToString(hash[:16])), nil
+}
+
+// метод для построения обратного индекса и хранения его в кэше для индексов и ID вакансий
+func (pm *ParserManager) buildReverseIndex(searchHash string, results []models.SearchResult) {
+	for _, parserResult := range results {
+		for i, vacancy := range parserResult.Vacancies {
+			compositeID := fmt.Sprintf("%s_%s", vacancy.Seeker, vacancy.ID)
+
+			indexEntry := models.VacancyIndex{
+				SearchHash: searchHash,
+				ParserName: parserResult.ParserName,
+				Index:      i,
+			}
+
+			// Сохраняем в индексный кэш (ТОТ ЖЕ ТИП!)
+			pm.vacancyIndex.AddItemWithTTL(compositeID, indexEntry, vacancyIndexCashDataTTL)
+		}
+	}
 }
