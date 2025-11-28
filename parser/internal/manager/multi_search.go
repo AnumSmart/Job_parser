@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	searchCashDataTTL = 10 * time.Minute // время жизни записей в кэше поиска
+	searchCashDataTTL = 1 * time.Minute // время жизни записей в кэше поиска
 )
 
 // Метод для мульти-поиска

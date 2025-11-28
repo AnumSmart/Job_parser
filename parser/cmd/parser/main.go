@@ -59,7 +59,11 @@ func main() {
 		case "1":
 			parserManager.MultiSearch(scanner)
 		case "2":
-			parserManager.GetVacancyDetails(scanner)
+			err := parserManager.GetVacancyDetails(scanner)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		case "3":
 			fmt.Println("👋 До свидания!")
 			return

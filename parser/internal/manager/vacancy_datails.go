@@ -8,23 +8,23 @@ import (
 	"time"
 )
 
-func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) {
+func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	fmt.Println("\n📄 Детали вакансии")
 
 	fmt.Print("Введите ID вакансии: ")
 	if !scanner.Scan() {
-		return
+		return fmt.Errorf("❌ Проблема со сканированием ввода\n")
 	}
 
 	vacancyID := strings.TrimSpace(scanner.Text())
 	if vacancyID == "" {
-		fmt.Println("❌ ID вакансии не может быть пустым")
-		return
+		//fmt.Println("❌ ID вакансии не может быть пустым")
+		return fmt.Errorf("❌ ID вакансии не может быть пустым\n")
 	}
 
 	fmt.Print("Введите источник (HH.ru/SuperJob.ru): ")
 	if !scanner.Scan() {
-		return
+		return fmt.Errorf("❌ ввели неверное имя сервиса\n")
 	}
 	source := strings.TrimSpace(scanner.Text())
 
@@ -38,15 +38,15 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) {
 	// пытаемся найти в кэше данные по заданному хэш ключу (составному индексу)
 	searchResIndex, ok := pm.vacancyIndex.GetItem(compositeID)
 	if !ok {
-		fmt.Printf("No Vacancy with ID:%s found in cache\n", vacancyID)
-		return
+		//fmt.Printf("No Vacancy with ID:%s found in cache\n", vacancyID)
+		return fmt.Errorf("No Vacancy with ID:%s found in cache\n", vacancyID)
 	}
 
 	// проводим type assertion, проверяем нужный тип
 	searchResIndexChecked, ok := searchResIndex.(models.VacancyIndex)
 	if !ok {
 		fmt.Println("Type assertion after GetVacancyDetails ---> failed!")
-		return
+		return fmt.Errorf("Type assertion after GetVacancyDetails ---> failed!\n")
 	}
 
 	// теперь из полученного из кэша индексов индекса мы можем найти нужный хэш запроса,
@@ -59,8 +59,8 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) {
 		// проводим type assertion, проверяем нужный тип
 		searchResChecked, ok := searchRes.([]models.SearchResult)
 		if !ok {
-			fmt.Println("Type assertion after multi-search ---> failed!")
-			return
+			//fmt.Println("Type assertion after multi-search ---> failed!")
+			return fmt.Errorf("Type assertion after multi-search ---> failed!\n")
 		}
 
 		for _, NeededElementRes := range searchResChecked {
@@ -74,12 +74,19 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) {
 		}
 	}
 
+	// !!!!!!!!!!!!!!!!!! падаем с паникой, если TTL кэша истекает, а мы обращаемся за данными к кэшу (к поисковому) ------- нужно исправить
 	// -------------------------------------------------------------------
 
 	printVacancyDetails(targetVacancy)
+	return nil
 }
 
 func printVacancyDetails(vacancy models.Vacancy) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			fmt.Println("recovered from PANIC: [ ", rec, " ]")
+		}
+	}()
 
 	fmt.Println("\n" + strings.Repeat("=", 50))
 	fmt.Printf("🏢 %s\n", vacancy.Job)
