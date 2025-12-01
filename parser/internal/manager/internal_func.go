@@ -33,7 +33,7 @@ func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, search
 
 			go func() {
 				start := time.Now()
-				vacancies, err := p.SearchVacancies(params)
+				vacancies, err := p.SearchVacancies(ctx, params)
 				duration := time.Since(start)
 
 				resultChan <- models.SearchResult{
@@ -106,7 +106,7 @@ func (pm *ParserManager) printMultiSearchResults(results []models.SearchResult, 
 	fmt.Printf("\n🎯 Всего найдено: %d вакансий\n", totalVacancies)
 }
 
-// метод для построения обратного индекса и хранения его в кэше для индексов и ID вакансий
+// метод для построения обратного индекса и хранения его в кэше №2 для индексов и ID вакансий
 func (pm *ParserManager) buildReverseIndex(searchHash string, results []models.SearchResult) {
 	for _, parserResult := range results {
 		for i, vacancy := range parserResult.Vacancies {
@@ -148,6 +148,15 @@ func genHashFromSearchParam(params models.SearchParams) (string, error) {
 	return fmt.Sprintf("%s", hex.EncodeToString(hash[:16])), nil
 }
 
+/*
+метод - обёртка над другими методами.
+
+	Формируем хэш для поиска
+	пытаемся поискать в кэше №1
+	если не удалось - делаем конкурентный запрос во все доступные сервисы
+	кэшируем данные в кэш №1
+	строим обратный индекс и кэшируем данные в кэш №2
+*/
 func (pm *ParserManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
 	// Запускаем конкурентный поиск по всем источникам, таймаут для отмены контекста получаем из .env
 	ctxTimeout, err := strconv.Atoi(pm.config.Api_conf.ConcSearchCtxTimeOut)
@@ -166,7 +175,7 @@ func (pm *ParserManager) search(ctx context.Context, params models.SearchParams)
 
 	searchRes, ok := pm.searchCache.GetItem(searchHash)
 	if ok {
-		// если можно получить данные из кэша, то получаем интерфейс.
+		// если можно получить данные из кэша №1, то получаем интерфейс.
 		// проводим type assertion, проверяем нужный тип
 		searchResChecked, ok := searchRes.([]models.SearchResult)
 		if !ok {
@@ -181,10 +190,10 @@ func (pm *ParserManager) search(ctx context.Context, params models.SearchParams)
 			return nil, fmt.Errorf("❌ Ошибка при конкурентном поиске данных во внешних источниках: %v\n", err)
 		}
 
-		//записываем данные в поисковый кэш
+		//записываем данные в поисковый кэш №1
 		pm.searchCache.AddItemWithTTL(searchHash, results, cacheTTL)
 
-		// Строим обратный индекс и сразу кэшируем его в кэше [index]models.VacanvyIndex
+		// Строим обратный индекс и сразу кэшируем его в кэше №2
 		pm.buildReverseIndex(searchHash, results)
 
 		return results, nil

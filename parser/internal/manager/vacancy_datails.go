@@ -16,6 +16,7 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 		return fmt.Errorf("❌ Проблема со сканированием ввода\n")
 	}
 
+	// переменная, куда сохранаяется ID искомой вакансии
 	vacancyID := strings.TrimSpace(scanner.Text())
 	if vacancyID == "" {
 		//fmt.Println("❌ ID вакансии не может быть пустым")
@@ -26,8 +27,11 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	if !scanner.Scan() {
 		return fmt.Errorf("❌ ввели неверное имя сервиса\n")
 	}
+	// переменная, куда кладём имя сервиса, в результатах поиска которого будем искать ID вакансии
 	source := strings.TrimSpace(scanner.Text())
 
+	// создаём составной индекс, в котором будет ID вакансии и сервис, в котором этот ID нужно будет искать
+	// этот составной индекс - будет ключем для кэша №2
 	compositeID := fmt.Sprintf("%s_%s", source, vacancyID)
 
 	// создаём переменную для искомой вакансии
@@ -36,14 +40,13 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	fmt.Println("⏳ Загружаем информацию...")
 
 	// -------------------------------------------------------------------
-	// пытаемся найти в кэше данные по заданному ключу (составному индексу)
+	// пытаемся найти в кэше №2 данные по заданному ключу (составному индексу)
 	searchResIndex, ok := pm.vacancyIndex.GetItem(compositeID)
 	if !ok {
-		//fmt.Printf("No Vacancy with ID:%s found in cache\n", vacancyID)
 		return fmt.Errorf("No Vacancy with ID:%s found in cache\n", vacancyID)
 	}
 
-	// проводим type assertion, проверяем нужный тип
+	// проводим type assertion, проверяем нужный тип (так как нам функция GetItem возвращает интерфейс)
 	searchResIndexChecked, ok := searchResIndex.(models.VacancyIndex)
 	if !ok {
 		fmt.Println("Type assertion after GetVacancyDetails ---> failed!")
@@ -60,7 +63,6 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 		// проводим type assertion, проверяем нужный тип
 		searchResChecked, ok := searchRes.([]models.SearchResult)
 		if !ok {
-			//fmt.Println("Type assertion after multi-search ---> failed!")
 			return fmt.Errorf("Type assertion after multi-search ---> failed!\n")
 		}
 
@@ -78,15 +80,12 @@ func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 		return fmt.Errorf("Search data --- expired!\n")
 	}
 
-	// !!!!!!!!!!!!!!!!!! падаем с паникой, если TTL кэша истекает, а мы обращаемся за данными к кэшу (к поисковому) ------- нужно исправить
-	// -------------------------------------------------------------------
-
 	printVacancyDetails(targetVacancy)
 
-	// -------------------------------------------------------------------
 	return nil
 }
 
+// функция вывода в консоль данных о найденой вакансии
 func printVacancyDetails(vacancy models.Vacancy) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -112,10 +111,12 @@ func printVacancyDetails(vacancy models.Vacancy) {
 
 	if description != "" {
 		fmt.Println("\n📝 Описание:")
-		//fmt.Println(cleanHTML(description))
+		fmt.Println(cleanHTML(description))
 		fmt.Println(description)
 	}
+
 	fmt.Println(strings.Repeat("=", 50))
+
 }
 
 func formatDate(t time.Time) string {

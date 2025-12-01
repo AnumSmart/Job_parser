@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	cacheTTL = 60 * time.Second // время жизни записей в кэше поиска
+	cacheTTL = 60 * time.Second // время жизни записей в кэше №1 и в кэше №2
 )
 
 // Метод для мульти-поиска
@@ -42,6 +42,7 @@ func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) error {
 	}
 	ctx := context.Background()
 
+	// запускаем комплексный метод поиска
 	results, err := pm.search(ctx, params)
 	if err != nil {
 		return err

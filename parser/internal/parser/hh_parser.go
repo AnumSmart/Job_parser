@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,9 +23,10 @@ const (
 
 // HHParser представляет парсер для HH.ru API
 type HHParser struct {
-	baseURL       string
-	httpClient    *http.Client
-	hhRateLimiter interfaces.RateLimiter
+	baseURL          string
+	httpClient       *http.Client
+	hhRateLimiter    interfaces.RateLimiter
+	requestSemaphore chan struct{} // буфер: 10-15, Дополнительный семафор для парсера
 }
 
 // NewHHParser создаёт новый экземпляр парсера (конструктор для парсера)
@@ -34,16 +36,36 @@ func NewHHParser() *HHParser {
 		baseURL: "https://api.hh.ru/vacancies",
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				// Согласовано с размером семафора!
+				MaxConnsPerHost:       10, // Столько же, сколько семафор
+				MaxIdleConnsPerHost:   5,  // Половина от активных
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ResponseHeaderTimeout: 5 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
 		},
-		hhRateLimiter: ratelimiter.NewChannelRateLimiter(hhRateLimit),
+		hhRateLimiter:    ratelimiter.NewChannelRateLimiter(hhRateLimit),
+		requestSemaphore: make(chan struct{}, 10),
 	}
 }
 
-func (p *HHParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy, error) {
+func (p *HHParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
 	// Строим URL с параметрами
 	apiURL, err := p.buildURL(params)
 	if err != nil {
 		return nil, fmt.Errorf("build URL failed: %w", err)
+	}
+
+	// обрабатываем семафор
+	select {
+	case p.requestSemaphore <- struct{}{}:
+		defer func() { <-p.requestSemaphore }()
+	case <-ctx.Done():
+		return nil, fmt.Errorf("Context HH error: %w", ctx.Err())
+	case <-time.After(2 * time.Second):
+		return nil, fmt.Errorf("HH API is busy, try again later")
 	}
 
 	// вызываем метод rate limiter до обращения к внешнему сервису
