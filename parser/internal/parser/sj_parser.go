@@ -1,15 +1,16 @@
 package parser
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"job_parser/internal/domain/models"
-	"job_parser/internal/interfaces"
-	"job_parser/internal/model"
-	ratelimiter "job_parser/internal/rate_limiter"
 	"net/http"
 	"net/url"
+	"parser/internal/domain/models"
+	"parser/internal/interfaces"
+	"parser/internal/model"
+	ratelimiter "parser/internal/rate_limiter"
 
 	"strconv"
 	"time"
@@ -20,10 +21,11 @@ const (
 )
 
 type SuperJobParser struct {
-	baseURL       string
-	apiKey        string
-	httpClient    *http.Client
-	sjRateLimiter interfaces.RateLimiter
+	baseURL          string
+	apiKey           string
+	httpClient       *http.Client
+	sjRateLimiter    interfaces.RateLimiter
+	requestSemaphore chan struct{} // буфер: 10-15, Дополнительный семафор для парсера
 }
 
 func NewSuperJobParser(apiKey string) *SuperJobParser {
@@ -32,8 +34,18 @@ func NewSuperJobParser(apiKey string) *SuperJobParser {
 		apiKey:  apiKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				// Согласовано с размером семафора!
+				MaxConnsPerHost:       10, // Столько же, сколько семафор
+				MaxIdleConnsPerHost:   5,  // Половина от активных
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ResponseHeaderTimeout: 5 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
 		},
-		sjRateLimiter: ratelimiter.NewChannelRateLimiter(sjRateLimit),
+		sjRateLimiter:    ratelimiter.NewChannelRateLimiter(sjRateLimit),
+		requestSemaphore: make(chan struct{}, 10), // буфер: 10-15, Дополнительный семафор для парсера
 	}
 }
 
@@ -41,7 +53,7 @@ func (p *SuperJobParser) GetName() string {
 	return "SuperJob.ru"
 }
 
-func (p *SuperJobParser) SearchVacancies(params models.SearchParams) ([]models.Vacancy, error) {
+func (p *SuperJobParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
 	apiURL, err := p.buildURL(params)
 	if err != nil {
 		return nil, fmt.Errorf("build URL failed: %w", err)
@@ -55,6 +67,16 @@ func (p *SuperJobParser) SearchVacancies(params models.SearchParams) ([]models.V
 	// Добавляем заголовки для SuperJob API
 	req.Header.Add("X-Api-App-Id", p.apiKey)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	// обрабатываем семафор
+	select {
+	case p.requestSemaphore <- struct{}{}:
+		defer func() { <-p.requestSemaphore }()
+	case <-ctx.Done():
+		return nil, fmt.Errorf("Context HH error: %w", ctx.Err())
+	case <-time.After(2 * time.Second):
+		return nil, fmt.Errorf("SJ API is busy, try again later")
+	}
 
 	// вызываем метод rate limiter до обращения к внешнему сервису
 	p.sjRateLimiter.Wait()

@@ -1,6 +1,6 @@
 package model
 
-import "job_parser/pkg"
+import "parser/pkg"
 
 // Структуры для SuperJob API
 type SuperJobResponse struct {

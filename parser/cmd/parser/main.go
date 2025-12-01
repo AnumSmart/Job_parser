@@ -60,13 +60,13 @@ func main() {
 			err := parserManager.MultiSearch(scanner)
 			if err != nil {
 				fmt.Println(err.Error())
-				return
+				continue
 			}
 		case "2":
 			err := parserManager.GetVacancyDetails(scanner)
 			if err != nil {
 				fmt.Println(err.Error())
-				return
+				continue
 			}
 		case "3":
 			fmt.Println("👋 До свидания!")
