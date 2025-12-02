@@ -3,10 +3,12 @@ package parser
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"parser/internal/circuitbreaker"
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
 	"parser/internal/model"
@@ -26,9 +28,12 @@ type SuperJobParser struct {
 	httpClient       *http.Client
 	sjRateLimiter    interfaces.RateLimiter
 	requestSemaphore chan struct{} // буфер: 10-15, Дополнительный семафор для парсера
+	sjCircuitBreaker interfaces.CBInterface
 }
 
 func NewSuperJobParser(apiKey string) *SuperJobParser {
+	// создаём конфиг для SJ circuit breaker
+	cbConfig := circuitbreaker.NewCircuitBreakerConfig(5, 3, 2, 10, 10) // [хардкодинг ---- плохо, нужно доделать!]
 	return &SuperJobParser{
 		baseURL: "https://api.superjob.ru/2.0/vacancies/",
 		apiKey:  apiKey,
@@ -46,6 +51,7 @@ func NewSuperJobParser(apiKey string) *SuperJobParser {
 		},
 		sjRateLimiter:    ratelimiter.NewChannelRateLimiter(sjRateLimit),
 		requestSemaphore: make(chan struct{}, 10), // буфер: 10-15, Дополнительный семафор для парсера
+		sjCircuitBreaker: circuitbreaker.NewCircutBreaker(cbConfig),
 	}
 }
 
@@ -54,56 +60,89 @@ func (p *SuperJobParser) GetName() string {
 }
 
 func (p *SuperJobParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
+	// Строим URL с параметрами
 	apiURL, err := p.buildURL(params)
 	if err != nil {
 		return nil, fmt.Errorf("build URL failed: %w", err)
 	}
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	// Используем Circuit Breaker для выполнения запроса
+	var vacancies []models.Vacancy
+
+	err = p.sjCircuitBreaker.Execute(func() error {
+		// ВСЁ, что связано с внешним вызовом API, внутри Execute
+
+		// обрабатываем семафор
+		select {
+		case p.requestSemaphore <- struct{}{}:
+			defer func() { <-p.requestSemaphore }()
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled while waiting for semaphore: %w", ctx.Err())
+		case <-time.After(2 * time.Second):
+			return fmt.Errorf("semaphore timeout: HH API is busy, try again later")
+		}
+
+		// вызываем метод rate limiter до обращения к внешнему сервису
+		p.sjRateLimiter.Wait()
+
+		// Выполняем HTTP запрос
+		req, err := http.NewRequest("GET", apiURL, nil)
+		if err != nil {
+			return fmt.Errorf("create request failed: %w", err)
+		}
+
+		// Добавляем заголовки для SuperJob API
+		req.Header.Add("X-Api-App-Id", p.apiKey)
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+		resp, err := p.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("HTTP request failed: %w", err)
+		}
+
+		defer func() {
+			io.Copy(io.Discard, resp.Body) // Сбрасываем тело для повторного использования соединения
+			resp.Body.Close()
+		}()
+
+		// Проверяем статус ответа
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+
+			// 5xx ошибки считаем как сбои для Circuit Breaker
+			if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+				return fmt.Errorf("API server error %d: %s", resp.StatusCode, string(body))
+			}
+		}
+		// Читаем и парсим ответ
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response failed: %w", err)
+		}
+
+		var searchResponse model.SuperJobResponse
+		if err := json.Unmarshal(body, &searchResponse); err != nil {
+			return fmt.Errorf("parse JSON failed: %w", err)
+		}
+
+		vacancies = p.convertToUniversal(searchResponse.Items)
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, err
+		// Проверяем, это ошибка Circuit Breaker или ошибка API
+		if errors.Is(err, circuitbreaker.ErrCircuitOpen) {
+			// Логируем состояние Circuit Breaker (пока в консоль) ------------------ ЛООООООООООООООГГГГГГГИИИИИИИИ
+
+			tR, tS, tF := p.sjCircuitBreaker.GetStats()
+			fmt.Printf("totalReq = %d, totalSuccess = %d, totalFailures = %d\n", tR, tS, tF)
+			return nil, fmt.Errorf("HH API is temporarily unavailable (circuit breaker open). Please try again later")
+		}
+		return nil, fmt.Errorf("search vacancies failed: %w", err)
 	}
 
-	// Добавляем заголовки для SuperJob API
-	req.Header.Add("X-Api-App-Id", p.apiKey)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	// обрабатываем семафор
-	select {
-	case p.requestSemaphore <- struct{}{}:
-		defer func() { <-p.requestSemaphore }()
-	case <-ctx.Done():
-		return nil, fmt.Errorf("Context HH error: %w", ctx.Err())
-	case <-time.After(2 * time.Second):
-		return nil, fmt.Errorf("SJ API is busy, try again later")
-	}
-
-	// вызываем метод rate limiter до обращения к внешнему сервису
-	p.sjRateLimiter.Wait()
-
-	// Выполняем HTTP запрос
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response failed: %w", err)
-	}
-
-	var sjResponse model.SuperJobResponse
-	if err := json.Unmarshal(body, &sjResponse); err != nil {
-		return nil, fmt.Errorf("parse JSON failed: %w", err)
-	}
-
-	return p.convertToUniversal(sjResponse.Items), nil
+	return vacancies, nil
 }
 
 func (p *SuperJobParser) buildURL(params models.SearchParams) (string, error) {

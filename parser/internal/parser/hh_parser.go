@@ -3,8 +3,10 @@ package parser
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"parser/internal/circuitbreaker"
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
 	"parser/internal/model"
@@ -27,11 +29,13 @@ type HHParser struct {
 	httpClient       *http.Client
 	hhRateLimiter    interfaces.RateLimiter
 	requestSemaphore chan struct{} // буфер: 10-15, Дополнительный семафор для парсера
+	hhCircuitBreaker interfaces.CBInterface
 }
 
 // NewHHParser создаёт новый экземпляр парсера (конструктор для парсера)
 func NewHHParser() *HHParser {
-
+	// создаём конфиг для HH circuit breaker
+	cbConfig := circuitbreaker.NewCircuitBreakerConfig(5, 3, 2, 10, 10) // [хардкодинг ---- плохо, нужно доделать!]
 	return &HHParser{
 		baseURL: "https://api.hh.ru/vacancies",
 		httpClient: &http.Client{
@@ -48,6 +52,7 @@ func NewHHParser() *HHParser {
 		},
 		hhRateLimiter:    ratelimiter.NewChannelRateLimiter(hhRateLimit),
 		requestSemaphore: make(chan struct{}, 10),
+		hhCircuitBreaker: circuitbreaker.NewCircutBreaker(cbConfig),
 	}
 }
 
@@ -58,44 +63,80 @@ func (p *HHParser) SearchVacancies(ctx context.Context, params models.SearchPara
 		return nil, fmt.Errorf("build URL failed: %w", err)
 	}
 
-	// обрабатываем семафор
-	select {
-	case p.requestSemaphore <- struct{}{}:
-		defer func() { <-p.requestSemaphore }()
-	case <-ctx.Done():
-		return nil, fmt.Errorf("Context HH error: %w", ctx.Err())
-	case <-time.After(2 * time.Second):
-		return nil, fmt.Errorf("HH API is busy, try again later")
-	}
+	// Используем Circuit Breaker для выполнения запроса
+	var vacancies []models.Vacancy
 
-	// вызываем метод rate limiter до обращения к внешнему сервису
-	p.hhRateLimiter.Wait()
+	err = p.hhCircuitBreaker.Execute(func() error {
+		// ВСЁ, что связано с внешним вызовом API, внутри Execute
 
-	// Выполняем HTTP запрос
-	resp, err := p.httpClient.Get(apiURL)
+		// обрабатываем семафор
+		select {
+		case p.requestSemaphore <- struct{}{}:
+			defer func() { <-p.requestSemaphore }()
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled while waiting for semaphore: %w", ctx.Err())
+		case <-time.After(2 * time.Second):
+			return fmt.Errorf("semaphore timeout: HH API is busy, try again later")
+		}
+
+		// вызываем метод rate limiter до обращения к внешнему сервису
+		p.hhRateLimiter.Wait()
+
+		// Выполняем HTTP запрос
+		req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+		if err != nil {
+			return fmt.Errorf("create request failed: %w", err)
+		}
+
+		resp, err := p.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("HTTP request failed: %w", err)
+		}
+
+		defer func() {
+			io.Copy(io.Discard, resp.Body) // Сбрасываем тело для повторного использования соединения
+			resp.Body.Close()
+		}()
+
+		// Проверяем статус ответа
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+
+			// 5xx ошибки считаем как сбои для Circuit Breaker
+			if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+				return fmt.Errorf("API server error %d: %s", resp.StatusCode, string(body))
+			}
+		}
+
+		// Читаем и парсим ответ
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response failed: %w", err)
+		}
+
+		var searchResponse model.SearchResponse
+		if err := json.Unmarshal(body, &searchResponse); err != nil {
+			return fmt.Errorf("parse JSON failed: %w", err)
+		}
+
+		vacancies = p.ConvertToUniversal(searchResponse.Items)
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
+		// Проверяем, это ошибка Circuit Breaker или ошибка API
+		if errors.Is(err, circuitbreaker.ErrCircuitOpen) {
+			// Логируем состояние Circuit Breaker (пока в консоль) ------------------ ЛООООООООООООООГГГГГГГИИИИИИИИ
 
-	// Проверяем статус ответа
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Читаем и парсим ответ
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response failed: %w", err)
+			tR, tS, tF := p.hhCircuitBreaker.GetStats()
+			fmt.Printf("totalReq = %d, totalSuccess = %d, totalFailures = %d\n", tR, tS, tF)
+			return nil, fmt.Errorf("HH API is temporarily unavailable (circuit breaker open). Please try again later")
+		}
+		return nil, fmt.Errorf("search vacancies failed: %w", err)
 	}
 
-	var searchResponse model.SearchResponse
-	if err := json.Unmarshal(body, &searchResponse); err != nil {
-		return nil, fmt.Errorf("parse JSON failed: %w", err)
-	}
-
-	return p.ConvertToUniversal(searchResponse.Items), nil
+	return vacancies, nil
 }
 
 // Приводит структуры найденных результатов к универсальной структуре для всех парсеров
