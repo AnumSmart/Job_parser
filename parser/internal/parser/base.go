@@ -17,6 +17,7 @@ import (
 type BaseConfig struct {
 	Name                  string                              // имя парсера (к какому источнику будет привязан)
 	BaseURL               string                              // базовый URL, через который бдет осуществляться парсинг
+	APIKey                string                              // API ключ, если предусмотрен сервисом
 	Timeout               time.Duration                       // таймаут для http клиента
 	RateLimit             time.Duration                       // интервал для rate limiter (ограничение частоты обращения к ресурсу)
 	MaxConcurrent         int                                 // резмер буфера для семафора (ограничение конкурентности), и ограничение для http клиента
@@ -32,6 +33,7 @@ type BaseConfig struct {
 type BaseParser struct {
 	name           string                 // имя парсера (к какому источнику будет привязан)
 	baseURL        string                 // базовый URL, через который бдет осуществляться парсинг
+	apiKey         string                 // API ключ, если предусмотрен сервисом
 	httpClient     *http.Client           // экземпляр клиента, через который будем проводить парсинг на внешнем источнике
 	rateLimiter    interfaces.RateLimiter // экземпляр rate limiter (ограничение частоты обращения к ресурсу)
 	circuitBreaker interfaces.CBInterface // экземпляр для circuit breaker (отказоустойчивость)
@@ -44,6 +46,7 @@ func NewBaseParser(config BaseConfig) *BaseParser {
 	return &BaseParser{
 		name:           config.Name,
 		baseURL:        config.BaseURL,
+		apiKey:         config.APIKey,
 		httpClient:     createHTTPClient(config),
 		rateLimiter:    ratelimiter.NewChannelRateLimiter(config.RateLimit),
 		circuitBreaker: circuitbreaker.NewCircutBreaker(config.CircuitBreakerCfg),
