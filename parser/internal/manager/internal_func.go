@@ -164,6 +164,11 @@ func (pm *ParserManager) search(ctx context.Context, params models.SearchParams)
 		return nil, fmt.Errorf("failed to convert ctxTimeOut from .env : %v\n", err)
 	}
 
+	// Создаем новый контекст с таймаутом, который будет отменен либо по таймауту,
+	// либо когда отменится родительский контекст (что наступит раньше)
+	searchCtx, cancel := context.WithTimeout(ctx, time.Duration(ctxTimeout)*time.Second)
+	defer cancel()
+
 	// получаем хэш для поиска
 	searchHash, err := genHashFromSearchParam(params)
 	if err != nil {
@@ -185,7 +190,8 @@ func (pm *ParserManager) search(ctx context.Context, params models.SearchParams)
 		return searchResChecked, nil
 	} else {
 		fmt.Println("⏳ Не удалось найти данные в кэше! Ищем вакансии во всех источниках...")
-		results, err := pm.concurrentSearchWithTimeout(ctx, searchHash, params, time.Duration(ctxTimeout)*time.Second)
+		// передаём созданный контектс searchCtx, чтобы синхронизировать таймауты
+		results, err := pm.concurrentSearchWithTimeout(searchCtx, searchHash, params, time.Duration(ctxTimeout)*time.Second)
 		if err != nil {
 			return nil, fmt.Errorf("❌ Ошибка при конкурентном поиске данных во внешних источниках: %v\n", err)
 		}

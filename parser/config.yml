@@ -1,0 +1,37 @@
+hh:
+  enabled: true
+  base_url: 'https://api.hh.ru/vacancies'
+  api_key: 'your_hh_api_key_here' # если нужен
+  timeout: 30s # общий таймаут для клиента, Значение достаточно большое, но ограничивающее "вечные" запросы
+  rate_limit: 2s
+  max_concurrent: 15
+  circuit_breaker:
+    failure_threshold: 5
+    success_threshold: 3
+    half_open_max_requests: 2
+    reset_timeout: 10s
+    window_duration: 10s
+  max_idle_conns: 10
+  idle_conn_timeout: 90s
+  tls_handshake_timeout: 10s
+  response_header_timeout: 5s
+  expect_continue_timeout: 1s
+
+superjob:
+  enabled: true
+  base_url: 'https://api.superjob.ru/2.0/vacancies/'
+  api_key: 'v3.r.137656321.7a5d9a8f8a6b...' # ваш ключ SuperJob
+  timeout: 30s # общий таймаут для клиента, Значение достаточно большое, но ограничивающее "вечные" запросы
+  rate_limit: 1s # другой rate limit для SuperJob
+  max_concurrent: 5 # меньше concurrent запросов
+  circuit_breaker:
+    failure_threshold: 3
+    success_threshold: 2
+    half_open_max_requests: 1
+    reset_timeout: 15s
+    window_duration: 15s
+  max_idle_conns: 5
+  idle_conn_timeout: 90s
+  tls_handshake_timeout: 10s
+  response_header_timeout: 5s
+  expect_continue_timeout: 1s

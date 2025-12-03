@@ -10,13 +10,6 @@ import (
 
 	"os"
 	"strings"
-	"time"
-)
-
-const (
-	numOfShards     = 7
-	searchCacheTTL  = 10 * time.Minute
-	vacancyCacheTTL = 60 * time.Minute
 )
 
 func main() {
@@ -29,16 +22,39 @@ func main() {
 		panic(err)
 	}
 
+	// создаём конфиг для парсеров
+	parsConf, err := (configs.LoadParseConfig(conf.ParsConfAddress))
+	if err != nil {
+		panic(err)
+	}
+
 	//создаём экземпляр inmemory cache для результатов поиска вакансий
-	searchCache := inmemory_cache.NewInmemoryShardedCache(numOfShards, searchCacheTTL)
+	searchCache := inmemory_cache.NewInmemoryShardedCache(conf.Cache_conf.NumOfShards, conf.Cache_conf.SearchCacheTTL)
 
 	//создаём экземпляр inmemory cache для обратного индекса для вакансий
-	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(numOfShards, vacancyCacheTTL)
+	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache_conf.NumOfShards, conf.Cache_conf.VacancyCacheTTL)
 
 	// Создаём парсеры
-	hhParser := parser.NewHHParser()
-	sjParser := parser.NewSuperJobParser(conf.Api_conf.SJAPIKey)
+	hhParser := parser.NewHHParser(parsConf.HH)
+	sjParser := parser.NewSJParser(parsConf.SuperJob)
 
+	/*
+		//создаём фабрику парсеров
+		ParserFactory := parser.NewParserFactory()
+
+		// регистрируем парсеры в фабрике
+		// НЕ ВЫЗЫВАЕМ функцию, а передаем ее как значение!
+		ParserFactory.Register("hh", parsConf.HH, parser.NewHHParser)
+		ParserFactory.Register("superjob", parsConf.SuperJob, parser.NewSJParser)
+
+		enabledParsers := []parser.ParserType{"hh", "superjob"}
+
+		parsers, err := ParserFactory.CreateEnabled(enabledParsers) // доработать использование фабрики-----------------------------
+		if err != nil {
+			panic(err)
+		}
+
+	*/
 	// Создаём менеджер парсеров
 	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, hhParser, sjParser)
 
