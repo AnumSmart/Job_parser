@@ -34,17 +34,6 @@ func LoadConfig() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
-	/*
-		cacheConfig, err := LoadCacheConfig(os.Getenv("CACHE_CONFIG_ADDRESS_STRING"))
-		if err != nil {
-			return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
-		}
-
-		parsersConfig, err := LoadParseConfig(os.Getenv("PARSES_CONFIG_ADDRESS_STRING"))
-		if err != nil {
-			return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
-		}
-	*/
 
 	cacheConfig, err := LoadYAMLConfig[CacheConfig](os.Getenv("CACHE_CONFIG_ADDRESS_STRING"), DefaultCacheConfig)
 	if err != nil {
