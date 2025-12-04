@@ -7,11 +7,6 @@ import (
 	"parser/internal/domain/models"
 	"strconv"
 	"strings"
-	"time"
-)
-
-const (
-	cacheTTL = 60 * time.Second // время жизни записей в кэше №1 и в кэше №2
 )
 
 // Метод для мульти-поиска

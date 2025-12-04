@@ -1,61 +1,90 @@
 package configs
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Api_conf        apiConfig
-	ParsConfAddress string // путь к .yml конфиг-файлу для экземпляров парсеров
-	Cache_conf      cachesConfig
+	API     APIConfig
+	Cache   *CacheConfig
+	Parsers *ParsersConfig
 }
 
-type apiConfig struct {
-	ConcSearchCtxTimeOut string
+type APIConfig struct {
+	ConcSearchTimeout time.Duration
+	ServerPort        string
 }
 
-type cachesConfig struct {
-	NumOfShards     int
-	SearchCacheTTL  time.Duration
-	VacancyCacheTTL time.Duration
-}
-
+// загружаем конфиг-данные из .env
 func LoadConfig() (*Config, error) {
 	err := godotenv.Load("c:\\Son_Alex\\GO_projects\\go_v_1_23\\Job_Parser\\parser\\.env")
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
-	// получаем количество шардов из .env (string ---> int)
-	cachesNumOfShards, err := strconv.Atoi(os.Getenv("NUM_OF_SHARDS"))
+	concSearchTimeOut, err := strconv.Atoi(os.Getenv("CONC_SEARCH_TIMEOUT"))
+	if err != nil {
+		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
+	}
+	/*
+		cacheConfig, err := LoadCacheConfig(os.Getenv("CACHE_CONFIG_ADDRESS_STRING"))
+		if err != nil {
+			return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
+		}
+
+		parsersConfig, err := LoadParseConfig(os.Getenv("PARSES_CONFIG_ADDRESS_STRING"))
+		if err != nil {
+			return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
+		}
+	*/
+
+	cacheConfig, err := LoadYAMLConfig[CacheConfig](os.Getenv("CACHE_CONFIG_ADDRESS_STRING"), DefaultCacheConfig)
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
-	searchCacheTTL, err := strconv.Atoi(os.Getenv("SEARCH_CACHE_TTL"))
-	if err != nil {
-		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
-	}
-
-	vacancyCacheTTL, err := strconv.Atoi(os.Getenv("VACANCY_CACHE_TTL"))
+	parsersConfig, err := LoadYAMLConfig[ParsersConfig](os.Getenv("PARSES_CONFIG_ADDRESS_STRING"), DefaultParsersConfig)
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
 	return &Config{
-		Api_conf: apiConfig{
-			ConcSearchCtxTimeOut: os.Getenv("CONC_SEARCH_TIMEOUT"),
+		API: APIConfig{
+			ConcSearchTimeout: time.Duration(concSearchTimeOut) * time.Second,
 		},
-		ParsConfAddress: os.Getenv("PARSES_CONFIG_ADDRESS_STRING"),
-		Cache_conf: cachesConfig{
-			NumOfShards:     cachesNumOfShards,
-			SearchCacheTTL:  time.Duration(searchCacheTTL) * time.Second,
-			VacancyCacheTTL: time.Duration(vacancyCacheTTL) * time.Second,
-		},
+		Cache:   cacheConfig,
+		Parsers: parsersConfig,
 	}, nil
+}
+
+// универсальня функция загрузки конфига из .yml файла (используем дженерики, так как будут ещё парсеры)
+func LoadYAMLConfig[T any](configPath string, fn func() *T) (*T, error) {
+	config := fn()
+
+	if configPath == "" {
+		return config, nil
+	}
+
+	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
+		return config, nil
+	}
+
+	yamlFile, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := yaml.Unmarshal(yamlFile, &config); err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }

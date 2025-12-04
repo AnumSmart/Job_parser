@@ -8,7 +8,7 @@ import (
 )
 
 // конструктор для создания кэша с указаным количеством шардов и интервалом очистки кэша
-func NewInmemoryShardedCache(numShards int, TTL time.Duration) *InmemoryShardedCache {
+func NewInmemoryShardedCache(numShards int, cleanUpInterval time.Duration) *InmemoryShardedCache {
 	// инициализируем базовую структуру кэша
 
 	cache := &InmemoryShardedCache{
@@ -25,15 +25,14 @@ func NewInmemoryShardedCache(numShards int, TTL time.Duration) *InmemoryShardedC
 	}
 
 	// асинхронно запускаем метод очистки кэша через поределённый интервал времени
-	go cache.cleanUp(TTL)
+	go cache.cleanUp(cleanUpInterval)
 
 	return cache
 }
 
-// метод получения занчения из кэша по заданному ключу (это хэшированный запрос поиска)
+// метод получения значения из кэша по заданному ключу (это хэшированный запрос поиска)
 // чтобы реализовать этот метод - нужна функция, которая будет находить нужный шард по заданному ключу (внутри будет хэш-функция)
 // результатом будет значение в CashItem и флаг
-
 func (c *InmemoryShardedCache) GetItem(key string) (interface{}, bool) {
 	// получаем необходимый шард
 	shard := c.GetShard(key)

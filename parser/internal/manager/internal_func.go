@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -119,7 +118,7 @@ func (pm *ParserManager) buildReverseIndex(searchHash string, results []models.S
 			}
 
 			// Сохраняем в индексный кэш (ТОТ ЖЕ ТИП!), TTL такой же как для кэша поиска
-			pm.vacancyIndex.AddItemWithTTL(compositeID, indexEntry, cacheTTL)
+			pm.vacancyIndex.AddItemWithTTL(compositeID, indexEntry, pm.config.Cache.VacancyCacheTTL)
 		}
 	}
 }
@@ -158,15 +157,9 @@ func genHashFromSearchParam(params models.SearchParams) (string, error) {
 	строим обратный индекс и кэшируем данные в кэш №2
 */
 func (pm *ParserManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
-	// Запускаем конкурентный поиск по всем источникам, таймаут для отмены контекста получаем из .env
-	ctxTimeout, err := strconv.Atoi(pm.config.Api_conf.ConcSearchCtxTimeOut)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert ctxTimeOut from .env : %v\n", err)
-	}
-
 	// Создаем новый контекст с таймаутом, который будет отменен либо по таймауту,
 	// либо когда отменится родительский контекст (что наступит раньше)
-	searchCtx, cancel := context.WithTimeout(ctx, time.Duration(ctxTimeout)*time.Second)
+	searchCtx, cancel := context.WithTimeout(ctx, pm.config.API.ConcSearchTimeout)
 	defer cancel()
 
 	// получаем хэш для поиска
@@ -191,13 +184,13 @@ func (pm *ParserManager) search(ctx context.Context, params models.SearchParams)
 	} else {
 		fmt.Println("⏳ Не удалось найти данные в кэше! Ищем вакансии во всех источниках...")
 		// передаём созданный контектс searchCtx, чтобы синхронизировать таймауты
-		results, err := pm.concurrentSearchWithTimeout(searchCtx, searchHash, params, time.Duration(ctxTimeout)*time.Second)
+		results, err := pm.concurrentSearchWithTimeout(searchCtx, searchHash, params, pm.config.API.ConcSearchTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("❌ Ошибка при конкурентном поиске данных во внешних источниках: %v\n", err)
 		}
 
 		//записываем данные в поисковый кэш №1
-		pm.searchCache.AddItemWithTTL(searchHash, results, cacheTTL)
+		pm.searchCache.AddItemWithTTL(searchHash, results, pm.config.Cache.SearchCacheTTL)
 
 		// Строим обратный индекс и сразу кэшируем его в кэше №2
 		pm.buildReverseIndex(searchHash, results)

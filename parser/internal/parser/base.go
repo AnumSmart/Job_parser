@@ -25,7 +25,7 @@ type BaseConfig struct {
 	MaxIdleConns          int                                 // максимальное количество бездействующих (keep-alive) соединений для http клиента (экономия ресурсов)
 	IdleConnTimeout       time.Duration                       // интервал, через сколько закрывать неиспользуемое соединение
 	TLSHandshakeTimeout   time.Duration                       // максимальное время ожидания завершения TLS handshake
-	ResponseHeaderTimeout time.Duration                       //интервал, сколько ждать ответа сервера после отправки запроса
+	ResponseHeaderTimeout time.Duration                       // интервал, сколько ждать ответа сервера после отправки запроса
 	ExpectContinueTimeout time.Duration                       // интервал, оптимизация для сценариев загрузки больших данных
 }
 
