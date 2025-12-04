@@ -12,7 +12,7 @@ type CircuitBreakerConfig struct {
 }
 
 // создаём конструктор для конфига circuit breaker
-// будем возвращать копию структуры, так как буту разные конфиги
+// будем возвращать копию структуры, так как будут разные конфиги
 func NewCircuitBreakerConfig(fTreshold, sTreshold, halfTreshold uint, resetTimeout, winDuration time.Duration) CircuitBreakerConfig {
 	return CircuitBreakerConfig{
 		FailureThreshold:    fTreshold,

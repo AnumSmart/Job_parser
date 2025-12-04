@@ -22,41 +22,31 @@ func main() {
 		panic(err)
 	}
 
-	// создаём конфиг для парсеров
-	parsConf, err := (configs.LoadParseConfig(conf.ParsConfAddress))
+	//создаём экземпляр inmemory cache для результатов поиска вакансий
+	searchCache := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.SearchCacheCleanUp)
+
+	//создаём экземпляр inmemory cache для обратного индекса для вакансий
+	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheCleanUp)
+
+	//создаём фабрику парсеров
+	ParserFactory := parser.NewParserFactory()
+
+	// регистрируем парсеры в фабрике
+	// НЕ ВЫЗЫВАЕМ функцию, а передаем ее как значение!
+	ParserFactory.Register("hh", conf.Parsers.HH, parser.NewHHParser)
+	ParserFactory.Register("superjob", conf.Parsers.SuperJob, parser.NewSJParser)
+
+	// создаём список парсеров для создания (пока хард-код, но в будущем это будут переменные)
+	enabledParsers := []parser.ParserType{"hh", "superjob"}
+
+	// создаём только те парсеры, у которых в конфиге указано Enabled
+	parsers, err := ParserFactory.CreateEnabled(enabledParsers)
 	if err != nil {
 		panic(err)
 	}
 
-	//создаём экземпляр inmemory cache для результатов поиска вакансий
-	searchCache := inmemory_cache.NewInmemoryShardedCache(conf.Cache_conf.NumOfShards, conf.Cache_conf.SearchCacheTTL)
-
-	//создаём экземпляр inmemory cache для обратного индекса для вакансий
-	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache_conf.NumOfShards, conf.Cache_conf.VacancyCacheTTL)
-
-	// Создаём парсеры
-	hhParser := parser.NewHHParser(parsConf.HH)
-	sjParser := parser.NewSJParser(parsConf.SuperJob)
-
-	/*
-		//создаём фабрику парсеров
-		ParserFactory := parser.NewParserFactory()
-
-		// регистрируем парсеры в фабрике
-		// НЕ ВЫЗЫВАЕМ функцию, а передаем ее как значение!
-		ParserFactory.Register("hh", parsConf.HH, parser.NewHHParser)
-		ParserFactory.Register("superjob", parsConf.SuperJob, parser.NewSJParser)
-
-		enabledParsers := []parser.ParserType{"hh", "superjob"}
-
-		parsers, err := ParserFactory.CreateEnabled(enabledParsers) // доработать использование фабрики-----------------------------
-		if err != nil {
-			panic(err)
-		}
-
-	*/
 	// Создаём менеджер парсеров
-	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, hhParser, sjParser)
+	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, parsers...)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)

@@ -60,20 +60,19 @@ func (f *ParserFactory) Create(parserType ParserType) (interfaces.Parser, error)
 	if !ok {
 		return nil, fmt.Errorf("config not found for parser: %s", parserType)
 	}
-
 	return constructor(config), nil
 }
 
 // CreateEnabled создает только включенные парсеры
-func (f *ParserFactory) CreateEnabled(enabled []ParserType) (map[ParserType]interfaces.Parser, error) {
-	parsers := make(map[ParserType]interfaces.Parser)
+func (f *ParserFactory) CreateEnabled(enabled []ParserType) ([]interfaces.Parser, error) {
+	parsers := make([]interfaces.Parser, len(enabled))
 
-	for _, parserType := range enabled {
+	for i, parserType := range enabled {
 		parser, err := f.Create(parserType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create parser %s: %w", parserType, err)
 		}
-		parsers[parserType] = parser
+		parsers[i] = parser
 	}
 
 	return parsers, nil

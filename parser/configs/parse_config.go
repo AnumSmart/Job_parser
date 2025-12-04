@@ -1,18 +1,16 @@
 package configs
 
 import (
-	"os"
 	"parser/internal/circuitbreaker"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
-type ParserConfig struct {
+type ParsersConfig struct {
 	HH       *ParserInstanceConfig `yaml:"hh"`
 	SuperJob *ParserInstanceConfig `yaml:"superjob"`
 }
 
+// структура конфига для отдельного парсера
 type ParserInstanceConfig struct {
 	Enabled               bool                                `yaml:"enabled"`
 	BaseURL               string                              `yaml:"base_url"`
@@ -28,9 +26,9 @@ type ParserInstanceConfig struct {
 	ExpectContinueTimeout time.Duration                       `yaml:"expect_continue_timeout"`
 }
 
-// DefaultConfig возвращает конфигурацию по умолчанию
-func DefaultConfig() *ParserConfig {
-	return &ParserConfig{
+// DefaultParsersConfig возвращает конфигурацию по умолчанию
+func DefaultParsersConfig() *ParsersConfig {
+	return &ParsersConfig{
 		HH: &ParserInstanceConfig{
 			Enabled:       true,
 			BaseURL:       "https://api.hh.ru/vacancies",
@@ -70,34 +68,4 @@ func DefaultConfig() *ParserConfig {
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
-}
-
-// LoadConfig загружает конфигурацию из YAML файла, объединяя с дефолтными значениями
-func LoadParseConfig(configPath string) (*ParserConfig, error) {
-	// Создаем дефолтную конфигурацию
-	config := DefaultConfig() // возвращает *ParserConfig
-
-	// Если путь к конфигу не указан, возвращаем дефолтный
-	if configPath == "" {
-		return config, nil
-	}
-
-	// Проверяем существование файла
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return config, nil
-	}
-
-	// Читаем файл
-	yamlFile, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Декодируем YAML
-	// config уже *ParserConfig, передаем как есть
-	if err := yaml.Unmarshal(yamlFile, config); err != nil {
-		return nil, err
-	}
-
-	return config, nil
 }

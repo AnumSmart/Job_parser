@@ -10,7 +10,7 @@ import (
 	"parser/configs"
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
-	"parser/internal/model"
+	"parser/internal/parser/model"
 	"reflect"
 	"strconv"
 )
@@ -23,7 +23,7 @@ type HHParser struct {
 // конструктор для парсера HH.ru
 func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 	if cfg == nil {
-		cfg = configs.DefaultConfig().HH
+		cfg = configs.DefaultParsersConfig().HH
 	}
 
 	baseCfg := BaseConfig{

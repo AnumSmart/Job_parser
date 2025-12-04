@@ -22,7 +22,7 @@ type Vacancy struct {
 	Schedule    string
 	URL         string
 	PublishedAt time.Time
-	Seeker      string // "hh", "superjob"
+	Seeker      string // "hh", "superjob", ...
 	Description string
 }
 
