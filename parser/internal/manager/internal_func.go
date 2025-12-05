@@ -13,7 +13,7 @@ import (
 )
 
 // concurrentSearchWithTimeout выполняет поиск во всех парсерах одновременно с таймаутом
-func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, searchHash string, params models.SearchParams, timeout time.Duration) ([]models.SearchResult, error) {
+func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, searchHash string, params models.SearchParams, timeout time.Duration) ([]models.SearchResult, error) {
 	// создаём контекст с таймаутом
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -74,7 +74,7 @@ func (pm *ParserManager) concurrentSearchWithTimeout(ctx context.Context, search
 }
 
 // Метод для вывода в консоль результатов поиска (с нужными атрибутами)
-func (pm *ParserManager) printMultiSearchResults(results []models.SearchResult, resultsPerPage int) {
+func (pm *ParsersManager) printMultiSearchResults(results []models.SearchResult, resultsPerPage int) {
 	totalVacancies := 0
 
 	for _, result := range results {
@@ -106,7 +106,7 @@ func (pm *ParserManager) printMultiSearchResults(results []models.SearchResult, 
 }
 
 // метод для построения обратного индекса и хранения его в кэше №2 для индексов и ID вакансий
-func (pm *ParserManager) buildReverseIndex(searchHash string, results []models.SearchResult) {
+func (pm *ParsersManager) buildReverseIndex(searchHash string, results []models.SearchResult) {
 	for _, parserResult := range results {
 		for i, vacancy := range parserResult.Vacancies {
 			compositeID := fmt.Sprintf("%s_%s", vacancy.Seeker, vacancy.ID)
@@ -156,7 +156,7 @@ func genHashFromSearchParam(params models.SearchParams) (string, error) {
 	кэшируем данные в кэш №1
 	строим обратный индекс и кэшируем данные в кэш №2
 */
-func (pm *ParserManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
+func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
 	// Создаем новый контекст с таймаутом, который будет отменен либо по таймауту,
 	// либо когда отменится родительский контекст (что наступит раньше)
 	searchCtx, cancel := context.WithTimeout(ctx, pm.config.API.ConcSearchTimeout)

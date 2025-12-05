@@ -78,8 +78,7 @@ type ParserFuncs struct {
 }
 
 // SearchVacancies общий метод для поиска вакансий
-func (p *BaseParser) SearchVacancies(ctx context.Context, params models.SearchParams,
-	funcs ParserFuncs) ([]models.Vacancy, error) {
+func (p *BaseParser) SearchVacancies(ctx context.Context, params models.SearchParams, funcs ParserFuncs) ([]models.Vacancy, error) {
 	// Строим URL с параметрами
 	apiURL, err := funcs.BuildURL(params)
 	if err != nil {
