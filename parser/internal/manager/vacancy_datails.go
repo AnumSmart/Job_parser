@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func (pm *ParserManager) GetVacancyDetails(scanner *bufio.Scanner) error {
+func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	fmt.Println("\n📄 Детали вакансии")
 
 	fmt.Print("Введите ID вакансии: ")

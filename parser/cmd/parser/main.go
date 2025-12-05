@@ -45,8 +45,11 @@ func main() {
 		panic(err)
 	}
 
+	// создаём мэнеджера состояния парсеров
+	parserStatusManager := manager.NewParserStatusManager()
+
 	// Создаём менеджер парсеров
-	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, parsers...)
+	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, parserStatusManager, parsers...)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)

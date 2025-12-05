@@ -10,7 +10,7 @@ import (
 )
 
 // Метод для мульти-поиска
-func (pm *ParserManager) MultiSearch(scanner *bufio.Scanner) error {
+func (pm *ParsersManager) MultiSearch(scanner *bufio.Scanner) error {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
 	var params models.SearchParams

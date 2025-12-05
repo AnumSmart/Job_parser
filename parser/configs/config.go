@@ -16,6 +16,7 @@ type Config struct {
 	API     APIConfig
 	Cache   *CacheConfig
 	Parsers *ParsersConfig
+	Manager *ParserManagerConfig
 }
 
 type APIConfig struct {
@@ -25,7 +26,7 @@ type APIConfig struct {
 
 // загружаем конфиг-данные из .env
 func LoadConfig() (*Config, error) {
-	err := godotenv.Load("c:\\Son_Alex\\GO_projects\\go_v_1_23\\Job_Parser\\parser\\.env")
+	err := godotenv.Load("c:\\Users\\aliaksei.makarevich\\go\\go_v_1_20\\Job_Parser\\parser\\.env")
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
@@ -40,7 +41,12 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
-	parsersConfig, err := LoadYAMLConfig[ParsersConfig](os.Getenv("PARSES_CONFIG_ADDRESS_STRING"), DefaultParsersConfig)
+	parsersConfig, err := LoadYAMLConfig[ParsersConfig](os.Getenv("PARSERS_CONFIG_ADDRESS_STRING"), DefaultParsersConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
+	}
+
+	parsersManagerConfig, err := LoadYAMLConfig[ParserManagerConfig](os.Getenv("PARSERS_CONFIG_ADDRESS_STRING"), DefaultParsersManagerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
@@ -51,6 +57,7 @@ func LoadConfig() (*Config, error) {
 		},
 		Cache:   cacheConfig,
 		Parsers: parsersConfig,
+		Manager: parsersManagerConfig,
 	}, nil
 }
 
