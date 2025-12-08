@@ -38,7 +38,7 @@ func (pm *ParsersManager) MultiSearch(scanner *bufio.Scanner) error {
 	ctx := context.Background()
 
 	// запускаем комплексный метод поиска
-	results, err := pm.search(ctx, params)
+	results, err := pm.search2(ctx, params)
 	if err != nil {
 		return err
 	}

@@ -31,7 +31,7 @@ func NewParserStatusManager() *ParserStatusManager {
 	}
 }
 
-// UpdateStatus обновляет статус парсера
+// UpdateStatus обновляет статус парсера в менеджере статуса парсеров
 func (m *ParserStatusManager) UpdateStatus(name string, success bool, err error) {
 	// так как мэнеджер статуса парсеров основан на мапе, все панипуляции проводит под мьютексом
 	m.mu.Lock()
@@ -70,7 +70,7 @@ func (m *ParserStatusManager) GetHealthyParsers() []string {
 
 	var healthy []string
 	for name, status := range m.parsers {
-		// проверяем, что статут парсера IsHeathy==true,Lastcheck бы не позднее 5 мин
+		// проверяем, что статус парсера IsHeathy==true,Lastcheck бы не позднее 5 мин
 		if status.IsHealthy && time.Since(status.LastCheck) < 5*time.Minute {
 			healthy = append(healthy, name)
 		}

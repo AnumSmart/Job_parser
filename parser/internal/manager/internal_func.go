@@ -1,18 +1,15 @@
 package manager
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"parser/internal/domain/models"
-	"parser/internal/interfaces"
-	"sync"
-	"time"
 )
 
-// concurrentSearchWithTimeout выполняет поиск во всех парсерах одновременно с таймаутом
+/*
+// concurrentSearchWithTimeout выполняет поиск во всех парсерах одновременно с таймаутом --- deprecated
 func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, searchHash string, params models.SearchParams, timeout time.Duration) ([]models.SearchResult, error) {
 	// создаём контекст с таймаутом
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -72,6 +69,8 @@ func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, searc
 
 	return searchResults, nil
 }
+
+*/
 
 // Метод для вывода в консоль результатов поиска (с нужными атрибутами)
 func (pm *ParsersManager) printMultiSearchResults(results []models.SearchResult, resultsPerPage int) {
@@ -148,14 +147,14 @@ func genHashFromSearchParam(params models.SearchParams) (string, error) {
 }
 
 /*
-метод - обёртка над другими методами.
+метод - обёртка над другими методами. ------------------------- deprecated!
 
 	Формируем хэш для поиска
 	пытаемся поискать в кэше №1
 	если не удалось - делаем конкурентный запрос во все доступные сервисы
 	кэшируем данные в кэш №1
 	строим обратный индекс и кэшируем данные в кэш №2
-*/
+
 func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
 	// Создаем новый контекст с таймаутом, который будет отменен либо по таймауту,
 	// либо когда отменится родительский контекст (что наступит раньше)
@@ -198,3 +197,5 @@ func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams
 		return results, nil
 	}
 }
+
+*/
