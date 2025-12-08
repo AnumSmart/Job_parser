@@ -39,7 +39,7 @@ func (cb *CircuitBreaker) Execute(fn func() error) error {
 	// Выполняем операцию
 	err := fn()
 
-	// вызываем мьютекс, так как меняем статус circut breaker фсинхронно
+	// вызываем мьютекс, так как меняем статус circut breaker асинхронно
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 
@@ -76,7 +76,7 @@ func (cb *CircuitBreaker) onFailure() {
 	}
 }
 
-// onFailure обрабатывает удачное выполнение
+// onSuccess обрабатывает удачное выполнение
 func (cb *CircuitBreaker) onSuccess() {
 	// проеряем статус circut breaker.
 	// тут мьютекс не нужен, так как внешний вызов уже из-под мьютекса

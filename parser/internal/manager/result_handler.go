@@ -4,70 +4,50 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"parser/internal/circuitbreaker"
 	"parser/internal/domain/models"
+	"strings"
 )
 
+// метод определния типов ошибок, если они были. Или это ошибки circut breaker или другие, или их не было и можно вернуть результат
 func (pm *ParsersManager) handleSearchResult(results []models.SearchResult, err error, params models.SearchParams) ([]models.SearchResult, error) {
+	// Случай 1: Всё идеально
 	if err == nil {
 		return results, nil
 	}
 
-	// Проверяем, это ошибка Circuit Breaker или другая ошибка
-	var cbErr pm.circuitBreaker.ErrCircuitBreakerOpen
-	
-	if errors.As(err, &cbErr) {
-		return pm.handleCircuitBreakerOpen(params, cbErr)
-	}
-
-	// Другие ошибки
+	// Случай 2: Частичный успех - есть результаты, но и есть ошибка
 	if len(results) > 0 {
-		// Частичный успех - логируем ошибку, но возвращаем результаты
-		fmt.Printf("⚠️  Частичный успех: %v\n", err)
-		return results, nil
-	}
-
-	// Полный сбой
-	return nil, fmt.Errorf("❌ Ошибка поиска: %v", err)
-}
-
-func (pm *ParsersManager) handleCircuitBreakerOpen(params models.SearchParams, cbErr error) ([]models.SearchResult, error) {
-	fmt.Println("🚨 Circuit Breaker открыт - используем кэшированные данные")
-
-	// Пробуем разные стратегии fallback
-	if results, ok := pm.tryFallbackStrategies(params); ok {
-		return results, nil
-	}
-
-	// Fallback не сработал
-	return nil, fmt.Errorf("❌ Сервис временно недоступен. Попробуйте позже. (Circuit Breaker открыт)")
-}
-
-func (pm *ParsersManager) tryFallbackStrategies(params models.SearchParams) ([]models.SearchResult, bool) {
-	// Стратегия 1: Поиск по более общему ключу
-	if results, ok := pm.tryGeneralCacheKey(params); ok {
-		return results, true
-	}
-
-	// Стратегия 2: Поиск похожих запросов
-	if results, ok := pm.trySimilarQueries(params); ok {
-		return results, true
-	}
-
-	// Стратегия 3: Статические/дефолтные данные
-	if results, ok := pm.tryStaticFallback(params); ok {
-		return results, true
-	}
-
-	return nil, false
-}
-
-func (pm *ParsersManager) tryGeneralCacheKey(params models.SearchParams) ([]models.SearchResult, bool) {
-	cacheKey := fmt.Sprintf("fallback:%s", params.Text)
-	if cached, ok := pm.searchCache.GetItem(cacheKey); ok {
-		if results, ok := cached.([]models.SearchResult); ok {
-			fmt.Println("✅ Найдены кэшированные данные для fallback")
-			return results, true
+		// тут возможно логирование....
+		// Проверяем, не связана ли ошибка с circuit breaker
+		if pm.isCircuitBreakerError(err) {
+			// Если circuit breaker открыт, но есть хоть какие-то результаты -
+			// возвращаем их с warning
+			return results, fmt.Errorf("частичные результаты (Parser manager circuit breaker): %w", err)
 		}
+
+		// Возвращаем результаты, которые удалось получить
+		return results, err
 	}
-	return nil, false
+
+	// Случай 3: Полный провал - нет результатов вообще
+	// Пробуем стратегии fallback
+	return pm.tryFallbackStrategies(params, err)
+}
+
+// метод - попытка получить данные из кэша (тут понимаем, что это ошибка НЕ от circuit breaker)
+func (pm *ParsersManager) tryFallbackStrategies(params models.SearchParams, originalErr error) ([]models.SearchResult, error) {
+	if results, found := pm.tryGetFromCache(params); found {
+		msg := "данные из кэша"
+		return results, fmt.Errorf("%s: %w", msg, originalErr)
+	}
+
+	return nil, fmt.Errorf("%s: %w", "Не удалось найти данные в кэше, ошибка: ", originalErr)
+}
+
+// метод определения ошибки. Это ошибка circuit breaker или нет
+func (pm *ParsersManager) isCircuitBreakerError(err error) bool {
+	return errors.Is(err, circuitbreaker.ErrCircuitOpen) ||
+		errors.Is(err, circuitbreaker.ErrTooManyRequests) ||
+		strings.Contains(err.Error(), "circuit breaker")
 }
