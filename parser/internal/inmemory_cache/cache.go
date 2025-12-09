@@ -42,7 +42,7 @@ func (c *InmemoryShardedCache) GetItem(key string) (interface{}, bool) {
 	defer shard.mu.RUnlock()
 	val, ok := shard.Items[key] // проверяем наличие значения по ключу в мапе шарда
 	if !ok {
-		fmt.Printf("No data in cache with key:%s\n", key)
+		//fmt.Printf("No data in cache with key:%s\n", key) -- место для логирования
 		return nil, false
 	}
 	// проверяем, не истёк ли TTL у значения

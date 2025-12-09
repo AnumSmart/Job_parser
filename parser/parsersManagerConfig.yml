@@ -1,4 +1,4 @@
-max_concurrent_parsers: 3 # глобальный семафор на использование парсеров
+max_concurrent_parsers: 12 # глобальный семафор на использование парсеров
 health_check_interval: 10s # интервал проверки систояния менеджера парсеров
 circuit_breaker:
   failure_threshold: 5 # порог количества неудачных запросов, после которого сработает citrut breaker

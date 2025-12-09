@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"parser/configs"
 	"parser/internal/inmemory_cache"
-	"parser/internal/manager"
+	"parser/internal/parsers_manager"
+	"parser/internal/parsers_status_manager"
+
 	"parser/internal/parser"
 
 	"os"
@@ -45,11 +47,11 @@ func main() {
 		panic(err)
 	}
 
-	// создаём мэнеджера состояния парсеров
-	parserStatusManager := manager.NewParserStatusManager()
+	// создаём мэнеджера состояния парсеров и инициализируем начальными значениями
+	parserStatusManager := parsers_status_manager.NewParserStatusManager(parsers...)
 
 	// Создаём менеджер парсеров
-	parserManager := manager.NewParserManager(conf, searchCache, vacancyIndex, parserStatusManager, parsers...)
+	parserManager := parsers_manager.NewParserManager(conf, searchCache, vacancyIndex, parserStatusManager, parsers...)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)
