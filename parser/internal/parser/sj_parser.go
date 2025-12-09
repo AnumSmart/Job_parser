@@ -15,20 +15,21 @@ import (
 	"strconv"
 )
 
-// создаём стркутуру парсера для HH.ru на базе общего парсера
-type HHParser struct {
+// создаём стркутуру парсера для SuperJob.ru на базе общего парсера
+type SJParser struct {
 	*BaseParser
 }
 
-// конструктор для парсера HH.ru
-func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
+// конструктор для парсера SuperJob.ru
+func NewSJParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 	if cfg == nil {
-		cfg = configs.DefaultParsersConfig().HH
+		cfg = configs.DefaultParsersConfig().SuperJob
 	}
 
 	baseCfg := BaseConfig{
-		Name:                  "HH.ru",
+		Name:                  "SuperJob.ru",
 		BaseURL:               cfg.BaseURL,
+		APIKey:                cfg.APIKey,
 		Timeout:               cfg.Timeout,
 		RateLimit:             cfg.RateLimit,
 		MaxConcurrent:         cfg.MaxConcurrent,
@@ -40,13 +41,13 @@ func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 		ExpectContinueTimeout: cfg.ExpectContinueTimeout,
 	}
 
-	return &HHParser{
+	return &SJParser{
 		BaseParser: NewBaseParser(baseCfg),
 	}
 }
 
 // метод парсера для поиска вакансий
-func (p *HHParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
+func (p *SJParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
 	return p.BaseParser.SearchVacancies(
 		ctx,
 		params,
@@ -59,7 +60,7 @@ func (p *HHParser) SearchVacancies(ctx context.Context, params models.SearchPara
 }
 
 // buildURL строит URL для API запроса
-func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
+func (p *SJParser) buildURL(params models.SearchParams) (string, error) {
 	// преобразуем строку запроса в структуру URL
 	u, err := url.Parse(p.baseURL)
 	if err != nil {
@@ -71,23 +72,17 @@ func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
 
 	// добавляем основной параметр поиска
 	if params.Text != "" {
-		query.Set("text", params.Text)
+		query.Set("keyword", params.Text)
 	}
 
 	// добавляем параметр - локация
 	if params.Area != "" {
-		query.Set("area", params.Area)
+		query.Set("town", p.convertArea(params.Area))
 	}
 
 	// добавляем параетры страниц
-	perPage := params.PerPage
-	if perPage <= 0 || perPage > 100 {
-		perPage = 20 // Значение по умолчанию
-	}
-	query.Set("per_page", strconv.Itoa(perPage))
-
 	if params.Page > 0 {
-		query.Set("page", strconv.Itoa(params.Page))
+		query.Set("page", strconv.Itoa(params.Page-1)) // SuperJob использует 0-based
 	}
 
 	// формируем строку эндпоинта для запроса
@@ -96,8 +91,8 @@ func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
 }
 
 // метод парсера обработки тела запроса
-func (p *HHParser) parseResponse(body []byte) (interface{}, error) {
-	var searchResponse model.SearchResponse
+func (p *SJParser) parseResponse(body []byte) (interface{}, error) {
+	var searchResponse model.SuperJobResponse
 	if err := json.Unmarshal(body, &searchResponse); err != nil {
 		return nil, fmt.Errorf("[Parser name: %s] parse reaponse body - failed: %w", p.name, err)
 	}
@@ -105,9 +100,9 @@ func (p *HHParser) parseResponse(body []byte) (interface{}, error) {
 }
 
 // метод приведения результатов поиска у унифицированной структуре + проверка данных их интерфейса
-func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vacancy, error) {
+func (p *SJParser) convertToUniversal(searchResponse interface{}) ([]models.Vacancy, error) {
 	// Проводим type assertion
-	searchResp, ok := searchResponse.(*model.SearchResponse)
+	searchResp, ok := searchResponse.(*model.SuperJobResponse)
 	if !ok {
 
 		// Для более детальной информации можно использовать reflect
@@ -118,27 +113,39 @@ func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vaca
 	// сразу инициализируем слайс универсальных вакансий, чтобы уменьшить количество переаалокаций, если выйдем за размер базового массива слайса
 	universalVacancies := make([]models.Vacancy, len(searchResp.Items))
 
-	for i, hhvacancy := range searchResp.Items {
-		// получаем строку-описания вилки зарплаты для каждой найденной записи
-		salary := hhvacancy.GetSalaryString()
-
+	for i, sjv := range searchResp.Items {
+		salary := sjv.GetSalaryString()
 		universalVacancies[i] = models.Vacancy{
-			ID:          hhvacancy.ID,
-			Job:         hhvacancy.Name,
-			Company:     hhvacancy.Employer.Name,
-			Currency:    hhvacancy.Salary.Currency,
+			ID:          strconv.Itoa(sjv.ID),
+			Job:         sjv.Profession,
+			Company:     sjv.FirmName,
+			Currency:    sjv.Currency,
 			Salary:      &salary,
-			Area:        hhvacancy.Area.Name,
-			URL:         hhvacancy.URL,
+			Area:        sjv.Town.Title,
+			URL:         sjv.Link,
 			Seeker:      p.GetName(),
-			Description: hhvacancy.Description,
+			Description: sjv.VacancyRichText,
 		}
 	}
 	return universalVacancies, nil
 }
 
+// метод для конвертации локации
+func (p *SJParser) convertArea(area string) string {
+	// Конвертируем коды регионов HH.ru в названия SuperJob
+	areas := map[string]string{
+		"1": "Москва",
+		"2": "Санкт-Петербург",
+	}
+	if name, ok := areas[area]; ok {
+		return name
+	}
+	return ""
+}
+
 // GetVacancyByID получает детальную информацию о вакансии по ID
-func (p *HHParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
+func (p *SJParser) GetVacancyByID(vacancyID string) (*model.SJVacancy, error) {
+	// Реализация получения деталей вакансии по ID
 	if vacancyID == "" {
 		return nil, fmt.Errorf("vacancy ID cannot be empty")
 	}
@@ -160,16 +167,11 @@ func (p *HHParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
 		return nil, fmt.Errorf("read response failed: %w", err)
 	}
 
-	var vacancy model.HHVacancy
 	//анмаршалим успешное тело ответа в в нужную структуру
+	var vacancy model.SJVacancy
 	if err := json.Unmarshal(body, &vacancy); err != nil {
-		return nil, fmt.Errorf("parse HH-JSON failed: %w", err)
+		return nil, fmt.Errorf("parse SJ-JSON failed: %w", err)
 	}
 
 	return &vacancy, nil
-}
-
-// получаем имя парсера
-func (p *HHParser) GetName() string {
-	return "HH.ru"
 }

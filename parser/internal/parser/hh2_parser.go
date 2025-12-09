@@ -4,26 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"parser/configs"
 	"parser/internal/domain/models"
-	"parser/internal/interfaces"
-	"parser/internal/parser/model"
-	"reflect"
+	"parser/internal/model"
+	"parser/internal/parser/config"
 	"strconv"
 )
 
-// создаём стркутуру парсера для HH.ru на базе общего парсера
-type HHParser struct {
+type HH2Parser struct {
 	*BaseParser
 }
 
-// конструктор для парсера HH.ru
-func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
+func NewHH2Parser(cfg *config.ParserInstanceConfig) *HH2Parser {
 	if cfg == nil {
-		cfg = configs.DefaultParsersConfig().HH
+		cfg = config.DefaultConfig().HH
 	}
 
 	baseCfg := BaseConfig{
@@ -40,13 +34,12 @@ func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 		ExpectContinueTimeout: cfg.ExpectContinueTimeout,
 	}
 
-	return &HHParser{
+	return &HH2Parser{
 		BaseParser: NewBaseParser(baseCfg),
 	}
 }
 
-// метод парсера для поиска вакансий
-func (p *HHParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
+func (p *HH2Parser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
 	return p.BaseParser.SearchVacancies(
 		ctx,
 		params,
@@ -59,27 +52,22 @@ func (p *HHParser) SearchVacancies(ctx context.Context, params models.SearchPara
 }
 
 // buildURL строит URL для API запроса
-func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
-	// преобразуем строку запроса в структуру URL
+func (p *HH2Parser) buildURL(params models.SearchParams) (string, error) {
 	u, err := url.Parse(p.baseURL)
 	if err != nil {
 		return "", err
 	}
 
-	// заводим переменную, где будут хнаниться значения
 	query := u.Query()
 
-	// добавляем основной параметр поиска
 	if params.Text != "" {
 		query.Set("text", params.Text)
 	}
-
-	// добавляем параметр - локация
 	if params.Area != "" {
 		query.Set("area", params.Area)
 	}
 
-	// добавляем параетры страниц
+	// Устанавливаем количество вакансий на странице
 	perPage := params.PerPage
 	if perPage <= 0 || perPage > 100 {
 		perPage = 20 // Значение по умолчанию
@@ -90,13 +78,12 @@ func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
 		query.Set("page", strconv.Itoa(params.Page))
 	}
 
-	// формируем строку эндпоинта для запроса
 	u.RawQuery = query.Encode()
 	return u.String(), nil
 }
 
 // метод парсера обработки тела запроса
-func (p *HHParser) parseResponse(body []byte) (interface{}, error) {
+func (p *HH2Parser) parseResponse(body []byte) (interface{}, error) {
 	var searchResponse model.SearchResponse
 	if err := json.Unmarshal(body, &searchResponse); err != nil {
 		return nil, fmt.Errorf("[Parser name: %s] parse reaponse body - failed: %w", p.name, err)
@@ -105,20 +92,16 @@ func (p *HHParser) parseResponse(body []byte) (interface{}, error) {
 }
 
 // метод приведения результатов поиска у унифицированной структуре + проверка данных их интерфейса
-func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vacancy, error) {
-	// Проводим type assertion
-	searchResp, ok := searchResponse.(*model.SearchResponse)
+func (p *HH2Parser) convertToUniversal(searchResponse interface{}) ([]models.Vacancy, error) {
+	hhVavancies, ok := searchResponse.([]model.HHVacancy)
 	if !ok {
-
-		// Для более детальной информации можно использовать reflect
-		fmt.Printf("----------------->>>[Parser name: %s] DEBUG: Type details: %v\n", p.name, reflect.TypeOf(searchResponse))
 		return nil, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name)
 	}
 
 	// сразу инициализируем слайс универсальных вакансий, чтобы уменьшить количество переаалокаций, если выйдем за размер базового массива слайса
-	universalVacancies := make([]models.Vacancy, len(searchResp.Items))
+	universalVacancies := make([]models.Vacancy, len(hhVavancies))
 
-	for i, hhvacancy := range searchResp.Items {
+	for i, hhvacancy := range hhVavancies {
 		// получаем строку-описания вилки зарплаты для каждой найденной записи
 		salary := hhvacancy.GetSalaryString()
 
@@ -135,41 +118,4 @@ func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vaca
 		}
 	}
 	return universalVacancies, nil
-}
-
-// GetVacancyByID получает детальную информацию о вакансии по ID
-func (p *HHParser) GetVacancyByID(vacancyID string) (*model.HHVacancy, error) {
-	if vacancyID == "" {
-		return nil, fmt.Errorf("vacancy ID cannot be empty")
-	}
-
-	apiURL := p.baseURL + "/" + vacancyID
-	resp, err := p.httpClient.Get(apiURL)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// если API - вернул ошибку, прерываем функцию
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response failed: %w", err)
-	}
-
-	var vacancy model.HHVacancy
-	//анмаршалим успешное тело ответа в в нужную структуру
-	if err := json.Unmarshal(body, &vacancy); err != nil {
-		return nil, fmt.Errorf("parse HH-JSON failed: %w", err)
-	}
-
-	return &vacancy, nil
-}
-
-// получаем имя парсера
-func (p *HHParser) GetName() string {
-	return "HH.ru"
 }

@@ -1,0 +1,59 @@
+package parsers_manager
+
+import (
+	"fmt"
+	"parser/internal/domain/models"
+	"strings"
+)
+
+// метод получения данных из поикового кэша по заданному хэшу поиска
+func (pm *ParsersManager) tryGetFromCache(params models.SearchParams) ([]models.SearchResult, bool) {
+	fmt.Println("\n" + strings.Repeat("=", 50))
+	fmt.Println("⏳ Ищем вакансии в кэше...")
+
+	searchHash, err := pm.generateSearchHash(params)
+	if err != nil {
+		fmt.Printf("⚠️  Ошибка генерации поискового хэша: %v\n", err)
+		return nil, false
+	}
+
+	// пытаемся найти в кэше данные по заданному хэш ключу
+	cached, ok := pm.searchCache.GetItem(searchHash)
+	if !ok {
+		fmt.Println("⏳ Не удалось найти данные в кэше!")
+		return nil, false
+	}
+
+	// если можно получить данные из кэша №1, то получаем интерфейс.
+	// проводим type assertion, проверяем нужный тип
+	results, ok := cached.([]models.SearchResult)
+	if !ok {
+		fmt.Println("⚠️  Type assertion для кэшированных данных не удался")
+		return nil, false
+	}
+
+	fmt.Println("✅ Найдены кэшированные данные")
+	return results, true
+}
+
+// метод для кэширования результатов поиска в 2 кэша (в поисковый кэш и в индексный)
+func (pm *ParsersManager) cacheSearchResults(params models.SearchParams, results []models.SearchResult) {
+	searchHash, err := pm.generateSearchHash(params)
+	if err != nil {
+		fmt.Printf("⚠️  Не удалось кэшировать результаты: %v\n", err)
+		return
+	}
+
+	//записываем данные в поисковый кэш №1
+	pm.searchCache.AddItemWithTTL(searchHash, results, pm.config.Cache.SearchCacheTTL)
+
+	// Строим обратный индекс и сразу кэшируем его в кэше №2
+	pm.buildReverseIndex(searchHash, results)
+
+	fmt.Printf("✅ Результаты поиска закэшированы в поисковом кэше (ключ: %s)\n", searchHash)
+}
+
+// метод обёртка для генерации поискового хэша
+func (pm *ParsersManager) generateSearchHash(params models.SearchParams) (string, error) {
+	return genHashFromSearchParam(params)
+}

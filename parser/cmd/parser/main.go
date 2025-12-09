@@ -2,28 +2,56 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
-	"job_parser/internal/interfaces"
-	"job_parser/internal/manager"
-	"job_parser/internal/model"
-	"job_parser/internal/parser"
+	"parser/configs"
+	"parser/internal/inmemory_cache"
+	"parser/internal/parsers_manager"
+	"parser/internal/parsers_status_manager"
+
+	"parser/internal/parser"
+
 	"os"
-	"strconv"
 	"strings"
-	"time"
 )
 
 func main() {
 	fmt.Println("🚀 Multi-Source Vacancy Parser запущен!")
 	fmt.Println("==========================")
 
-	// Создаём парсеры
-	hhParser := parser.NewHHParser()
-	sjParser := parser.NewSuperJobParser(os.Getenv("SUPERJOB_API_KEY"))
+	// создаём config
+	conf, err := configs.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	//создаём экземпляр inmemory cache для результатов поиска вакансий
+	searchCache := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.SearchCacheCleanUp)
+
+	//создаём экземпляр inmemory cache для обратного индекса для вакансий
+	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheCleanUp)
+
+	//создаём фабрику парсеров
+	ParserFactory := parser.NewParserFactory()
+
+	// регистрируем парсеры в фабрике
+	// НЕ ВЫЗЫВАЕМ функцию, а передаем ее как значение!
+	ParserFactory.Register("hh", conf.Parsers.HH, parser.NewHHParser)
+	ParserFactory.Register("superjob", conf.Parsers.SuperJob, parser.NewSJParser)
+
+	// создаём список парсеров для создания (пока хард-код, но в будущем это будут переменные)
+	enabledParsers := []parser.ParserType{"hh", "superjob"}
+
+	// создаём только те парсеры, у которых в конфиге указано Enabled
+	parsers, err := ParserFactory.CreateEnabled(enabledParsers)
+	if err != nil {
+		panic(err)
+	}
+
+	// создаём мэнеджера состояния парсеров и инициализируем начальными значениями
+	parserStatusManager := parsers_status_manager.NewParserStatusManager(parsers...)
 
 	// Создаём менеджер парсеров
-	parserManager := manager.NewParserManager(hhParser, sjParser)
+	parserManager := parsers_manager.NewParserManager(conf, searchCache, vacancyIndex, parserStatusManager, parsers...)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)
@@ -40,9 +68,17 @@ func main() {
 
 		switch choice {
 		case "1":
-			multiSearch(parserManager, scanner)
+			err := parserManager.MultiSearch(scanner)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
 		case "2":
-			getVacancyDetails(hhParser, scanner)
+			err := parserManager.GetVacancyDetails(scanner)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
 		case "3":
 			fmt.Println("👋 До свидания!")
 			return
@@ -57,173 +93,6 @@ func main() {
 func printMenu() {
 	fmt.Println("📋 Меню:")
 	fmt.Println("1. Поиск вакансий (расширенный)")
-	fmt.Println("2. Получить детали вакансии по ID")
+	fmt.Println("2. Получить детали вакансии по ID ")
 	fmt.Println("3. Выход")
-}
-
-// Функция для мульти-поиска
-func multiSearch(parserManager *manager.ParserManager, scanner *bufio.Scanner) {
-	fmt.Println("\n🌐 Мульти-поиск вакансий")
-
-	var params interfaces.SearchParams
-
-	fmt.Print("Введите поисковый запрос: ")
-	if scanner.Scan() {
-		params.Text = strings.TrimSpace(scanner.Text())
-	}
-
-	fmt.Print("Количество вакансий на источник (max 50): ")
-	if scanner.Scan() {
-		countStr := strings.TrimSpace(scanner.Text())
-		if countStr != "" {
-			if count, err := strconv.Atoi(countStr); err == nil && count > 0 {
-				params.PerPage = count
-			}
-		}
-	}
-
-	if params.PerPage == 0 {
-		params.PerPage = 20
-	}
-
-	fmt.Println("⏳ Ищем вакансии во всех источниках...")
-
-	ctx := context.Background()
-	results, err := parserManager.ConcurrentSearchWithTimeout(ctx, params, 10*time.Second)
-
-	if err != nil {
-		fmt.Printf("❌ Ошибка при поиске: %v\n", err)
-		return
-	}
-
-	printMultiSearchResults(results)
-}
-
-func printMultiSearchResults(results []manager.SearchResult) {
-	totalVacancies := 0
-
-	for _, result := range results {
-		fmt.Printf("\n📊 %s:\n", result.ParserName)
-		fmt.Printf("   ⏱️  Время: %v\n", result.Duration)
-
-		if result.Error != nil {
-			fmt.Printf("   ❌ Ошибка: %v\n", result.Error)
-			continue
-		}
-
-		fmt.Printf("   ✅ Найдено: %d вакансий\n", len(result.Vacancies))
-		totalVacancies += len(result.Vacancies)
-
-		// Показываем первые 3 вакансии из каждого источника
-		for i, vacancy := range result.Vacancies {
-			if i >= 10 {
-				break
-			}
-			fmt.Printf("      %d. %s - %s, company:%s, URL:[ %s ], ID:%s\n", i+1, vacancy.Job, *vacancy.Salary, vacancy.Company, vacancy.URL, vacancy.ID)
-		}
-
-		if len(result.Vacancies) > 10 {
-			fmt.Printf("      ... и ещё %d\n", len(result.Vacancies)-3)
-		}
-	}
-
-	fmt.Printf("\n🎯 Всего найдено: %d вакансий\n", totalVacancies)
-}
-
-func getVacancyDetails(hhParser *parser.HHParser, scanner *bufio.Scanner) {
-	fmt.Println("\n📄 Детали вакансии")
-
-	fmt.Print("Введите ID вакансии: ")
-	if !scanner.Scan() {
-		return
-	}
-
-	vacancyID := strings.TrimSpace(scanner.Text())
-	if vacancyID == "" {
-		fmt.Println("❌ ID вакансии не может быть пустым")
-		return
-	}
-
-	fmt.Println("⏳ Загружаем информацию...")
-
-	vacancy, err := hhParser.GetVacancyByID(vacancyID)
-	if err != nil {
-		fmt.Printf("❌ Ошибка при загрузке вакансии: %v\n", err)
-		return
-	}
-
-	printVacancyDetails(vacancy)
-}
-
-func printVacancies(vacancies []model.HHVacancy) {
-	if len(vacancies) == 0 {
-		fmt.Println("😞 Вакансии не найдены")
-		return
-	}
-
-	for i, vacancy := range vacancies {
-		fmt.Printf("\n%d. %s\n", i+1, vacancy.Name)
-		fmt.Printf("   💼 %s\n", vacancy.Employer.Name)
-		fmt.Printf("   💰 %s\n", vacancy.GetSalaryString())
-		fmt.Printf("   📍 %s\n", vacancy.Area.Name)
-		//fmt.Printf("   🕐 %s\n", formatDate(vacancy.PublishedAt))
-		fmt.Printf("   🔗 %s\n", vacancy.URL)
-		fmt.Printf("   🆔 %s\n", vacancy.ID)
-	}
-}
-
-func printVacancyDetails(vacancy *model.HHVacancy) {
-	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Printf("🏢 %s\n", vacancy.Name)
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("💼 Работодатель: %s\n", vacancy.Employer.Name)
-	fmt.Printf("💰 Зарплата: %s\n", vacancy.GetSalaryString())
-	fmt.Printf("📍 Местоположение: %s\n", vacancy.Area.Name)
-	//fmt.Printf("🕐 Опубликовано: %s\n", formatDate(vacancy.PublishedAt))
-	fmt.Printf("🔗 Ссылка: %s\n", vacancy.URL)
-	fmt.Printf("🆔 ID: %s\n", vacancy.ID)
-
-	// Обрезаем описание для читаемости
-	description := vacancy.Description
-	if len(description) > 500 {
-		description = description[:500] + "..."
-	}
-
-	if description != "" {
-		fmt.Println("\n📝 Описание:")
-		fmt.Println(cleanHTML(description))
-	}
-
-	fmt.Println(strings.Repeat("=", 50))
-}
-
-func formatDate(t time.Time) string {
-	return t.Format("02.01.2006 15:04")
-}
-
-func cleanHTML(text string) string {
-	// Простая очистка HTML тегов
-	text = strings.ReplaceAll(text, "<p>", "\n")
-	text = strings.ReplaceAll(text, "<br>", "\n")
-	text = strings.ReplaceAll(text, "<li>", "• ")
-
-	// Удаляем HTML теги
-	var result strings.Builder
-	var inTag bool
-
-	for _, ch := range text {
-		if ch == '<' {
-			inTag = true
-			continue
-		}
-		if ch == '>' {
-			inTag = false
-			continue
-		}
-		if !inTag {
-			result.WriteRune(ch)
-		}
-	}
-
-	return strings.TrimSpace(result.String())
 }
