@@ -4,7 +4,7 @@ hh:
   api_key: 'your_hh_api_key_here' # если нужен
   timeout: 30s # общий таймаут для клиента, Значение достаточно большое, но ограничивающее "вечные" запросы
   rate_limit: 2s # для HH.ru есть ограничение не более 30 запросов/мин, значит интервал между запросами = 2с
-  max_concurrent: 15 # меньше concurrent запросов
+  max_concurrent: 10 # меньше concurrent запросов
   circuit_breaker:
     failure_threshold: 5 # порог количества неудачных запросов, после которого сработает citrut breaker
     success_threshold: 3 # Кол-во успешных запросов для перехода в Closed
