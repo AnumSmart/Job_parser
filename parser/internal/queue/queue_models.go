@@ -1,6 +1,6 @@
 package queue
 
-// структура для очереди
+// структура для очереди (дженерики)
 type FIFOQueue[T any] struct {
 	items chan T
 }
