@@ -7,6 +7,7 @@ import (
 	"parser/internal/inmemory_cache"
 	"parser/internal/parsers_manager"
 	"parser/internal/parsers_status_manager"
+	"runtime"
 
 	"parser/internal/parser"
 
@@ -15,6 +16,11 @@ import (
 )
 
 func main() {
+
+	// Получить количество CPU (то же, что runtime.NumCPU())
+	currentMaxProcs := runtime.GOMAXPROCS(-1)
+	fmt.Printf("Текущее значение GOMAXPROCS: %d\n", currentMaxProcs)
+
 	fmt.Println("🚀 Multi-Source Vacancy Parser запущен!")
 	fmt.Println("==========================")
 
@@ -51,7 +57,7 @@ func main() {
 	parserStatusManager := parsers_status_manager.NewParserStatusManager(parsers...)
 
 	// Создаём менеджер парсеров
-	parserManager := parsers_manager.NewParserManager(conf, searchCache, vacancyIndex, parserStatusManager, parsers...)
+	parserManager := parsers_manager.NewParserManager(conf, currentMaxProcs, searchCache, vacancyIndex, parserStatusManager, parsers...)
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)
