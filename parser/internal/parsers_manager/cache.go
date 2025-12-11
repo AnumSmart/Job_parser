@@ -45,7 +45,7 @@ func (pm *ParsersManager) cacheSearchResults(params models.SearchParams, results
 	}
 
 	//записываем данные в поисковый кэш №1
-	pm.searchCache.AddItemWithTTL(searchHash, results, pm.config.Cache.SearchCacheTTL)
+	pm.searchCache.AddItemWithTTL(searchHash, results, pm.config.Cache.SearchCacheConfig.SearchCacheTTL)
 
 	// Строим обратный индекс и сразу кэшируем его в кэше №2
 	pm.buildReverseIndex(searchHash, results)

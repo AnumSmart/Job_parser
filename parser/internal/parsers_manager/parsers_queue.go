@@ -79,6 +79,7 @@ func (pm *ParsersManager) Shutdown() {
 
 	// Ожидаем завершения всех воркеров
 	done := make(chan struct{})
+
 	go func() {
 		pm.wg.Wait()
 		close(done)
