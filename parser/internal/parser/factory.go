@@ -4,6 +4,7 @@ package parser
 
 import (
 	"fmt"
+
 	"parser/configs"
 	"parser/internal/interfaces"
 	"sync"

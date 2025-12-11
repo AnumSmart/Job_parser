@@ -3,6 +3,7 @@
 package parsers_status_manager
 
 import (
+	"parser/configs"
 	"parser/internal/interfaces"
 	"sync"
 	"time"
@@ -10,26 +11,37 @@ import (
 
 // структура статуса отдельного парсера
 type ParserStatus struct {
-	Name         string    // имя парсера
-	LastCheck    time.Time // время последней проверки статуса
-	ErrorCount   int       // количество состояний, что парсер в ошибке
-	SuccessCount int       // количество состояний, что парсер - без ошибок
-	IsHealthy    bool      // состояние
-	LastError    error     // последняя ошибка
-	CircuitState string    // "closed", "open", "half-open" (состояние внутреннего circuit breaker)
-	initialized  bool      // false - просто создан парсер, true - была попытка запроса
+	Name           string        // имя парсера
+	LastCheck      time.Time     // время последней проверки статуса
+	LastSuccess    time.Time     // время последней успешной проверки
+	ErrorCount     int           // количество состояний, что парсер в ошибке
+	SuccessCount   int           // количество состояний, что парсер - без ошибок
+	IsHealthy      bool          // состояние
+	LastError      error         // последняя ошибка
+	CircuitState   string        // "closed", "open", "half-open" (состояние внутреннего circuit breaker)
+	initialized    bool          // false - просто создан парсер, true - была попытка запроса
+	HealthEndpoint string        // URL для health check
+	ResponseTime   time.Duration // время ответа от парсера
+	mu             sync.RWMutex
 }
 
 // ParserStatusManager управляет статусами всех парсеров
+// ключ - это имя экземпляра парсера
 type ParserStatusManager struct {
-	mu      sync.RWMutex
-	parsers map[string]*ParserStatus
+	parsers      map[string]*ParserStatus   // мапа статусов парсеров
+	config       *configs.HealthCheckConfig // конфиг мэнеджера статусов
+	client       interfaces.HealthClient    // клиент для проверки
+	initComplete chan struct{}              // Сигнал завершения инициализации
+	mu           sync.RWMutex
 }
 
-// конструктор для нового менеджера парсеров
-func NewParserStatusManager(parsers ...interfaces.Parser) *ParserStatusManager {
+// конструктор для нового менеджера статусов парсеров--------------------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!
+func NewParserStatusManager(conf *configs.HealthCheckConfig, parsers ...interfaces.Parser) *ParserStatusManager {
 	psm := &ParserStatusManager{
-		parsers: make(map[string]*ParserStatus),
+		parsers:      make(map[string]*ParserStatus),
+		config:       conf, // конфиг для коиента health check
+		client:       NewHttpHealthCheckClient(conf),
+		initComplete: make(chan struct{}),
 	}
 	var parsersNames []string
 
@@ -47,7 +59,6 @@ func NewParserStatusManager(parsers ...interfaces.Parser) *ParserStatusManager {
 			CircuitState: "closed",
 		}
 	}
-
 	return psm
 }
 
@@ -105,14 +116,14 @@ func (m *ParserStatusManager) GetHealthyParsers() []string {
 }
 
 // GetStatus возвращает статус конкретного парсера
-func (m *ParserStatusManager) GetParserStatus(name string) (ParserStatus, bool) {
+func (m *ParserStatusManager) GetParserStatus(name string) (*ParserStatus, bool) {
 	// так как мэнеджер статуса парсеров основан на мапе, все панипуляции проводит под мьютексом
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	status, exists := m.parsers[name]
 	if !exists {
-		return ParserStatus{}, false
+		return nil, false
 	}
-	return *status, true
+	return status, true
 }

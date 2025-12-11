@@ -13,10 +13,11 @@ import (
 )
 
 type Config struct {
-	API     APIConfig
-	Cache   *CacheConfig
-	Parsers *ParsersConfig
-	Manager *ParserManagerConfig
+	API         APIConfig
+	Cache       *CachesConfig
+	Parsers     *ParsersConfig
+	Manager     *ParserManagerConfig
+	HealthChech *HealthCheckConfig
 }
 
 type APIConfig struct {
@@ -36,7 +37,7 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
-	cacheConfig, err := LoadYAMLConfig[CacheConfig](os.Getenv("CACHE_CONFIG_ADDRESS_STRING"), DefaultCacheConfig)
+	cacheConfig, err := LoadYAMLConfig[CachesConfig](os.Getenv("CACHES_CONFIG_ADDRESS_STRING"), DefaultCacheConfig)
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
@@ -51,13 +52,19 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
+	healthCheckConfig, err := LoadYAMLConfig[HealthCheckConfig](os.Getenv("HEALTH_CHECK_CONFIG_ADDRESS_STRING"), DefaultHealthCheckConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
+	}
+
 	return &Config{
 		API: APIConfig{
 			ConcSearchTimeout: time.Duration(concSearchTimeOut) * time.Second,
 		},
-		Cache:   cacheConfig,
-		Parsers: parsersConfig,
-		Manager: parsersManagerConfig,
+		Cache:       cacheConfig,
+		Parsers:     parsersConfig,
+		Manager:     parsersManagerConfig,
+		HealthChech: healthCheckConfig,
 	}, nil
 }
 
