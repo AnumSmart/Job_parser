@@ -33,7 +33,7 @@ func NewHttpHealthCheckClient(conf *configs.HealthCheckConfig) *HttpHealthCheckC
 }
 
 // метод для выполнения тестовго запроса для проверки healthCheck
-func (h *HttpHealthCheckClient) CheckHealth(ctx context.Context, endpoint string) (time.Duration, error) {
+func (h *HttpHealthCheckClient) CheckHealth(ctx context.Context, endpoint string) (time.Duration, bool, error) {
 	// создаём кнтекст с таймаутом для контроля времени запроса
 	reqCtx, cancel := context.WithTimeout(ctx, h.timeout)
 	defer cancel()
@@ -43,7 +43,7 @@ func (h *HttpHealthCheckClient) CheckHealth(ctx context.Context, endpoint string
 	// формируем запрос с контектом
 	req, err := http.NewRequestWithContext(reqCtx, "GET", endpoint, nil)
 	if err != nil {
-		return 0, err
+		return 0, false, fmt.Errorf("Failed to create request with context for health check: %v", err)
 	}
 
 	// устанавливаем заголовок
@@ -52,18 +52,23 @@ func (h *HttpHealthCheckClient) CheckHealth(ctx context.Context, endpoint string
 	// делаем запрос с помощью клиента
 	resp, err := h.client.Do(req)
 
-	// высчитываем время запроса
-	reqDuration := time.Since(start)
-	if err != nil {
-		return reqDuration, err
-	}
+	select {
+	case <-ctx.Done():
+		return h.timeout, false, ctx.Err()
+	default:
+		// высчитываем время запроса
+		reqDuration := time.Since(start)
+		if err != nil {
+			return reqDuration, false, fmt.Errorf("Err during health request: %v", err)
+		}
 
-	// очищаем ресурсы
-	defer resp.Body.Close()
+		// очищаем ресурсы (после проверки ошибок)
+		defer resp.Body.Close()
 
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return reqDuration, nil
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			return reqDuration, true, nil
+		}
+		// возвращаем ошибку проверки работоспособности
+		return reqDuration, false, fmt.Errorf("health check failed with status: %d", resp.StatusCode)
 	}
-	// возвращаем ошибку проверки работоспособности
-	return reqDuration, fmt.Errorf("health check failed with status: %d", resp.StatusCode)
 }

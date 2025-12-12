@@ -17,6 +17,7 @@ import (
 type BaseConfig struct {
 	Name                  string                              // имя парсера (к какому источнику будет привязан)
 	BaseURL               string                              // базовый URL, через который бдет осуществляться парсинг
+	HealthEndPoint        string                              // URL, через который бдет осуществляться health check
 	APIKey                string                              // API ключ, если предусмотрен сервисом
 	Timeout               time.Duration                       // таймаут для http клиента
 	RateLimit             time.Duration                       // интервал для rate limiter (ограничение частоты обращения к ресурсу)
@@ -33,6 +34,7 @@ type BaseConfig struct {
 type BaseParser struct {
 	name           string                 // имя парсера (к какому источнику будет привязан)
 	baseURL        string                 // базовый URL, через который бдет осуществляться парсинг
+	healthEndPoint string                 // URL, через который бдет осуществляться health check
 	apiKey         string                 // API ключ, если предусмотрен сервисом
 	httpClient     *http.Client           // экземпляр клиента, через который будем проводить парсинг на внешнем источнике
 	rateLimiter    interfaces.RateLimiter // экземпляр rate limiter (ограничение частоты обращения к ресурсу)
@@ -46,6 +48,7 @@ func NewBaseParser(config BaseConfig) *BaseParser {
 	return &BaseParser{
 		name:           config.Name,
 		baseURL:        config.BaseURL,
+		healthEndPoint: config.HealthEndPoint,
 		apiKey:         config.APIKey,
 		httpClient:     createHTTPClient(config),
 		rateLimiter:    ratelimiter.NewChannelRateLimiter(config.RateLimit),
@@ -223,4 +226,8 @@ func (p *BaseParser) GetName() string {
 // GetHTTPClient возвращает HTTP клиент
 func (p *BaseParser) GetHTTPClient() *http.Client {
 	return p.httpClient
+}
+
+func (p *BaseParser) GetHealthEndPoint() string {
+	return p.healthEndPoint
 }
