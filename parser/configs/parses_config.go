@@ -14,6 +14,7 @@ type ParsersConfig struct {
 type ParserInstanceConfig struct {
 	Enabled               bool                                `yaml:"enabled"`
 	BaseURL               string                              `yaml:"base_url"`
+	HealthEndPoint        string                              `yaml:"health_endpoint"`
 	APIKey                string                              `yaml:"api_key"`
 	Timeout               time.Duration                       `yaml:"timeout"`
 	RateLimit             time.Duration                       `yaml:"rate_limit"`

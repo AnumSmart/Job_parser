@@ -1,6 +1,7 @@
 hh:
   enabled: true # разрешено ли использовать этот конфиг
   base_url: 'https://api.hh.ru/vacancies' #базовый URL для формирования поиска по запросу
+  health_endpoint: 'https://api.hh.ru/vacancies?per_page=1' # проверка что API сервиса - в рабочем состоянии
   api_key: 'your_hh_api_key_here' # если нужен
   timeout: 30s # общий таймаут для клиента, Значение достаточно большое, но ограничивающее "вечные" запросы
   rate_limit: 2s # для HH.ru есть ограничение не более 30 запросов/мин, значит интервал между запросами = 2с
@@ -20,6 +21,7 @@ hh:
 superjob:
   enabled: true # разрешено ли использовать этот конфиг
   base_url: 'https://api.superjob.ru/2.0/vacancies/' #базовый URL для формирования поиска по запросу
+  health_endpoint: 'https://api.superjob.ru/2.0/vacancies/?count=1' # проверка что API сервиса - в рабочем состоянии
   api_key: 'v3.r.137656321.7a5d9a8f8a6b...' # ваш ключ SuperJob
   timeout: 30s # общий таймаут для клиента, Значение достаточно большое, но ограничивающее "вечные" запросы
   rate_limit: 1s # другой rate limit для SuperJob

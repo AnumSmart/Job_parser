@@ -82,6 +82,8 @@ func (pm *ParsersManager) Shutdown() {
 
 	go func() {
 		pm.wg.Wait()
+		// останавливаем менеджер статутос парсеров
+		pm.parsersStatusManager.Stop()
 		close(done)
 	}()
 

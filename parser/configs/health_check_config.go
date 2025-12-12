@@ -5,6 +5,7 @@ import "time"
 type HealthCheckConfig struct {
 	RequestTimeOut          time.Duration           `yaml:"request_timeout"`        // Таймаут на один health check запрос
 	Initialization_timeout  time.Duration           `yaml:"initialization_timeout"` // Максимальное время инициализации
+	HealthCheckInterval     time.Duration           `yaml:"check_interval"`         // интервал периодической проверки состояния сервисов, куда ходят парсеры
 	HealthCheckClientConfig HealthCheckClientConfig `yaml:"http_client"`            // healthCheck client
 }
 
@@ -21,6 +22,7 @@ func DefaultHealthCheckConfig() *HealthCheckConfig {
 	return &HealthCheckConfig{
 		RequestTimeOut:         5 * time.Second,
 		Initialization_timeout: 10 * time.Second,
+		HealthCheckInterval:    60 * time.Second,
 		HealthCheckClientConfig: HealthCheckClientConfig{
 			TimeOut:               5 * time.Second,
 			MaxIdleConns:          10,

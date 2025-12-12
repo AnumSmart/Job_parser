@@ -5,6 +5,7 @@ health_check:
   # Таймауты
   request_timeout: '5s' # Таймаут на один health check запрос
   initialization_timeout: '10s' # Максимальное время инициализации
+  check_interval: '60s' # интервал проверки состояния сервисов, куда ходят парсеры
 
   # Настройки HTTP клиента
   http_client:
