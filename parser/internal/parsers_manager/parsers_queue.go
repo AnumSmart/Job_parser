@@ -23,7 +23,7 @@ func (pm *ParsersManager) worker(id int) {
 		select {
 		case <-pm.stopWorkers: // канал для остановки всех воркеров
 			// Получен сигнал остановки
-			fmt.Printf("Worker #%d: received stop signal\n", id)
+			//fmt.Printf("Worker #%d: received stop signal\n", id)
 			return
 		default:
 			job, ok := pm.jobQueue.Dequeue()
@@ -72,6 +72,7 @@ func (pm *ParsersManager) proccessJob(job *models.SearchJob) {
 
 // метод для остановки всех воркеров
 func (pm *ParsersManager) Shutdown() {
+	fmt.Println("============================================================================")
 	fmt.Println("Initiating shutdown...")
 
 	// Закрываем канал - все воркеры получат сигнал

@@ -29,6 +29,7 @@ func NewSJParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 	baseCfg := BaseConfig{
 		Name:                  "SuperJob.ru",
 		BaseURL:               cfg.BaseURL,
+		HealthEndPoint:        cfg.HealthEndPoint,
 		APIKey:                cfg.APIKey,
 		Timeout:               cfg.Timeout,
 		RateLimit:             cfg.RateLimit,

@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+/*
 // структура статуса отдельного парсера
 type ParserStatus struct {
 	Name           string        // имя парсера
@@ -26,35 +27,36 @@ type ParserStatus struct {
 	ResponseTime   time.Duration // время ответа от парсера
 	mu             sync.RWMutex
 }
+*/
 
 // ParserStatusManager управляет статусами всех парсеров
 // ключ - это имя экземпляра парсера
 type ParserStatusManager struct {
-	parsers      map[string]*ParserStatus   // мапа статусов парсеров
-	config       *configs.HealthCheckConfig // конфиг мэнеджера статусов
-	client       interfaces.HealthClient    // клиент для проверки
-	initComplete chan struct{}              // Сигнал завершения инициализации
+	parsersStats map[string]*interfaces.ParserStatus // мапа статусов парсеров
+	config       *configs.Config                     // конфиг
+	client       interfaces.HealthClient             // клиент для проверки
+	initComplete chan struct{}                       // Сигнал завершения инициализации
 	stopChan     chan struct{}
 	mu           sync.RWMutex
 	wg           sync.WaitGroup
 }
 
 // конструктор для нового менеджера статусов парсеров
-func NewParserStatusManager(conf *configs.HealthCheckConfig, parsers ...interfaces.Parser) *ParserStatusManager {
+func NewParserStatusManager(conf *configs.Config, parsers ...interfaces.Parser) *ParserStatusManager {
 	psm := &ParserStatusManager{
-		parsers:      make(map[string]*ParserStatus),
+		parsersStats: make(map[string]*interfaces.ParserStatus),
 		config:       conf, // конфиг для коиента health check
-		client:       NewHttpHealthCheckClient(conf),
+		client:       NewHttpHealthCheckClient(conf.HealthChech),
 		initComplete: make(chan struct{}),
 		stopChan:     make(chan struct{}),
 	}
 
 	// инициализируем статусы парсеров в менеджере статусов
 	for _, parser := range parsers {
-		psm.parsers[parser.GetName()] = &ParserStatus{
+		psm.parsersStats[parser.GetName()] = &interfaces.ParserStatus{
 			Name:           parser.GetName(),
 			LastCheck:      time.Now(),
-			initialized:    false,
+			Initialized:    false,
 			CircuitState:   "closed",
 			HealthEndpoint: parser.GetHealthEndPoint(),
 			IsHealthy:      false, // Начальное состояние - не здоров
@@ -63,16 +65,6 @@ func NewParserStatusManager(conf *configs.HealthCheckConfig, parsers ...interfac
 
 	// Запускаем фоновую горутину для опроса
 	psm.startHealthChecker()
-
-	//----------------для тестового запуска----------------------
-
-	fmt.Println("------------------DEBUG INFORMATION------------------")
-	for name, status := range psm.parsers {
-		fmt.Printf("Parser:%s, Healthy: %v\n", name, status.IsHealthy)
-	}
-	fmt.Println("------------------DEBUG INFORMATION------------------")
-	//----------------для тестового запуска----------------------
-
 	return psm
 }
 
@@ -90,7 +82,7 @@ func (psm *ParserStatusManager) startHealthChecker() {
 		close(psm.initComplete)
 
 		// запускаем тикер, который через определённое время будет запускать проверку состояния парсеров
-		ticker := time.NewTicker(psm.config.HealthCheckInterval)
+		ticker := time.NewTicker(psm.config.HealthChech.HealthCheckInterval)
 		defer ticker.Stop()
 
 		for {
@@ -114,23 +106,41 @@ func (psm *ParserStatusManager) performHealthCheck() {
 		name     string // имя парсера
 		healthy  bool   // статус текущего состояния
 		initDone bool   // статус, что прошёл первую инициализацию
+		err      error  // ошибка для отладки
 	}
 
 	// создаём буфферизированный канал, куда будем складывать результаты опросов статусов парсеров
-	results := make(chan checkResult, len(psm.parsers))
+	results := make(chan checkResult, len(psm.parsersStats))
 	//необходима внутренняя waitgroup для согласования горутин
 	var wg sync.WaitGroup
 
 	psm.mu.RLock()
-	for name, status := range psm.parsers {
+	for name, status := range psm.parsersStats {
 		wg.Add(1)
 		go func(n string, endpoint string) {
 			defer wg.Done()
+
 			_, healthy, err := psm.client.CheckHealth(context.Background(), endpoint)
-			if err != nil {
-				results <- checkResult{name: n, healthy: healthy, initDone: true}
+
+			// Определяем статус инициализации
+			initDone := true // После первой проверки считаем инициализированным
+
+			/*
+				// Логируем для отладки
+				if err != nil {
+					fmt.Printf("Parser %s: CheckHealth error: %v\n", n, err)
+				} else {
+					fmt.Printf("Parser %s: healthy=%v\n", n, healthy)
+				}
+			*/
+
+			// Отправляем ОДИН результат
+			results <- checkResult{
+				name:     n,
+				healthy:  healthy && err == nil, // Здоров только если healthy=true И нет ошибки
+				initDone: initDone,
+				err:      err,
 			}
-			results <- checkResult{name: n, healthy: false, initDone: false}
 
 		}(name, status.HealthEndpoint)
 	}
@@ -145,32 +155,34 @@ func (psm *ParserStatusManager) performHealthCheck() {
 	// Собираем результаты
 	for result := range results {
 		psm.mu.Lock()
-		if parser, exists := psm.parsers[result.name]; exists {
+		if parser, exists := psm.parsersStats[result.name]; exists {
 			parser.IsHealthy = result.healthy
 			parser.LastCheck = time.Now()
-			parser.initialized = result.initDone
+			parser.Initialized = result.initDone
 		}
 		psm.mu.Unlock()
+
 	}
 	// Все проверки завершены, все статусы обновлены
 
 }
 
 // UpdateStatus обновляет статус парсера в менеджере статуса парсеров (потокобезопасен, есть мьютекс внутри)
+// этот метод вызывается отдельно от периодического опроса (допустим, после успешного похода парсера во внешний сервис)
 func (psm *ParserStatusManager) UpdateStatus(name string, success bool, err error) {
 	// так как мэнеджер статуса парсеров основан на мапе, все панипуляции проводит под мьютексом
 	psm.mu.Lock()
 	defer psm.mu.Unlock()
 
-	status, exists := psm.parsers[name] // пытаемся получить статус парсера по ключу
+	status, exists := psm.parsersStats[name] // пытаемся получить статус парсера по ключу
 	// если его нету, то добавляем новый в менеджер статуса парсеров
 	if !exists {
-		status = &ParserStatus{
+		status = &interfaces.ParserStatus{
 			Name:        name,
-			initialized: true,
+			Initialized: true,
 			LastCheck:   time.Now(),
 		}
-		psm.parsers[name] = status
+		psm.parsersStats[name] = status
 	}
 
 	status.LastCheck = time.Now()
@@ -196,7 +208,7 @@ func (psm *ParserStatusManager) GetHealthyParsers() []string {
 
 	var healthy []string
 
-	for name, status := range psm.parsers {
+	for name, status := range psm.parsersStats {
 		if status.IsHealthy && time.Since(status.LastCheck) < 5*time.Minute {
 			// проверяем, что статус парсера IsHeathy==true,Lastcheck бы не позднее 5 мин
 			healthy = append(healthy, name)
@@ -207,15 +219,16 @@ func (psm *ParserStatusManager) GetHealthyParsers() []string {
 }
 
 // GetStatus возвращает статус конкретного парсера
-func (psm *ParserStatusManager) GetParserStatus(name string) (*ParserStatus, bool) {
+func (psm *ParserStatusManager) GetParserStatus(name string) (*interfaces.ParserStatus, bool) {
 	// так как мэнеджер статуса парсеров основан на мапе, все панипуляции проводит под мьютексом
 	psm.mu.RLock()
 	defer psm.mu.RUnlock()
 
-	status, exists := psm.parsers[name]
+	status, exists := psm.parsersStats[name]
 	if !exists {
 		return nil, false
 	}
+
 	return status, true
 }
 

@@ -17,6 +17,10 @@ type HttpHealthCheckClient struct {
 }
 
 func NewHttpHealthCheckClient(conf *configs.HealthCheckConfig) *HttpHealthCheckClient {
+	if conf == nil {
+		conf = configs.DefaultHealthCheckConfig()
+	}
+
 	return &HttpHealthCheckClient{
 		client: &http.Client{
 			Timeout: conf.HealthCheckClientConfig.TimeOut, // общий таймаут клиента

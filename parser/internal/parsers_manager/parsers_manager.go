@@ -2,13 +2,13 @@
 package parsers_manager
 
 import (
+	"errors"
 	"math"
 	"parser/configs"
 	"parser/internal/circuitbreaker"
 	"parser/internal/domain/models"
 	"parser/internal/inmemory_cache"
 	"parser/internal/interfaces"
-	"parser/internal/parsers_status_manager"
 	"parser/internal/queue"
 	"sync"
 	"time"
@@ -16,12 +16,12 @@ import (
 
 // структура менеджера парсеров
 type ParsersManager struct {
-	parsers              []interfaces.Parser                         // парсеры, которыми оперирует мэнеджер
-	config               *configs.Config                             // общий конфиг
-	searchCache          *inmemory_cache.InmemoryShardedCache        // поисковый кэш
-	vacancyIndex         *inmemory_cache.InmemoryShardedCache        // кэш для обратного индекса
-	parsersStatusManager *parsers_status_manager.ParserStatusManager // менеджер сотсояний парверов внутри менеджера
-	circuitBreaker       interfaces.CBInterface                      // глобальный circut breaker (используем интерфейс)
+	parsers              []interfaces.Parser                  // парсеры, которыми оперирует мэнеджер
+	config               *configs.Config                      // общий конфиг
+	searchCache          *inmemory_cache.InmemoryShardedCache // поисковый кэш
+	vacancyIndex         *inmemory_cache.InmemoryShardedCache // кэш для обратного индекса
+	parsersStatusManager interfaces.ParsersStatusManager      // менеджер сотсояний парверов внутри менеджера
+	circuitBreaker       interfaces.CBInterface               // глобальный circut breaker (используем интерфейс)
 
 	// Поля для управления нагрузкой --------------------------------------------------------------------------
 	semaphore          chan struct{}                                    // Семафор для ограничения одновременных запросов
@@ -61,11 +61,22 @@ func NewParserManager(config *configs.Config,
 	numCPUCores int,
 	searchCache *inmemory_cache.InmemoryShardedCache,
 	vacancyIndex *inmemory_cache.InmemoryShardedCache,
-	pStatManager *parsers_status_manager.ParserStatusManager,
-	parsers ...interfaces.Parser) *ParsersManager {
+	pStatManager interfaces.ParsersStatusManager,
+	parsers ...interfaces.Parser) (*ParsersManager, error) {
 
 	// запускаем конструктор параметров для управления нагрузкой в парсер менеджере
 	pmLoad := NewPMLoad(numCPUCores)
+
+	// Валидация
+	if pStatManager == nil {
+		return nil, errors.New("ParsersStatusManager обязателен")
+	}
+	if len(parsers) == 0 {
+		return nil, errors.New("нужен хотя бы один парсер")
+	}
+	if searchCache == nil || vacancyIndex == nil {
+		return nil, errors.New("кэши обязательны")
+	}
 
 	pm := &ParsersManager{
 		parsers:              parsers,
@@ -85,7 +96,7 @@ func NewParserManager(config *configs.Config,
 	// Запускаем воркеры для обработки очереди
 	pm.startWorkers()
 
-	return pm
+	return pm, nil
 }
 
 // GetAllParsers возвращает список доступных парсеров

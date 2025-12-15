@@ -1,6 +1,6 @@
 package queue
 
-// структура для очереди (дженерики)
+// структура для очереди
 type FIFOQueue[T any] struct {
 	items  chan T
 	closed int32 // 0 = открыт, 1 = закрыт
