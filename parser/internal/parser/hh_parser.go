@@ -29,6 +29,7 @@ func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 	baseCfg := BaseConfig{
 		Name:                  "HH.ru",
 		BaseURL:               cfg.BaseURL,
+		HealthEndPoint:        cfg.HealthEndPoint,
 		Timeout:               cfg.Timeout,
 		RateLimit:             cfg.RateLimit,
 		MaxConcurrent:         cfg.MaxConcurrent,

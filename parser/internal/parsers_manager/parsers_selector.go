@@ -10,8 +10,9 @@ import (
 func (pm *ParsersManager) selectParsersForSearch() []string {
 	// Сначала берем здоровые парсеры
 	healthyParsers := pm.getHealthyParsers()
-	fmt.Printf("нашлись здоровые парсеры: %v\n", healthyParsers)
 	if len(healthyParsers) > 0 {
+		fmt.Printf("нашлись здоровые парсеры: %v\n", healthyParsers)
+		fmt.Printf("Количество здоровых парсеров: %v\n", len(healthyParsers))
 		return healthyParsers
 	}
 

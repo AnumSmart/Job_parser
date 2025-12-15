@@ -7,6 +7,7 @@ import (
 	"parser/internal/inmemory_cache"
 	"parser/internal/parsers_manager"
 	"parser/internal/parsers_status_manager"
+	"runtime"
 
 	"parser/internal/parser"
 
@@ -15,6 +16,11 @@ import (
 )
 
 func main() {
+
+	// Получить количество CPU (то же, что runtime.NumCPU())
+	currentMaxProcs := runtime.GOMAXPROCS(-1)
+	fmt.Printf("Текущее значение GOMAXPROCS: %d\n", currentMaxProcs)
+
 	fmt.Println("🚀 Multi-Source Vacancy Parser запущен!")
 	fmt.Println("==========================")
 
@@ -25,10 +31,10 @@ func main() {
 	}
 
 	//создаём экземпляр inmemory cache для результатов поиска вакансий
-	searchCache := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.SearchCacheCleanUp)
+	searchCache := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.SearchCacheConfig.SearchCacheCleanUp)
 
 	//создаём экземпляр inmemory cache для обратного индекса для вакансий
-	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheCleanUp)
+	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheConfig.VacancyCacheCleanUp)
 
 	//создаём фабрику парсеров
 	ParserFactory := parser.NewParserFactory()
@@ -48,10 +54,13 @@ func main() {
 	}
 
 	// создаём мэнеджера состояния парсеров и инициализируем начальными значениями
-	parserStatusManager := parsers_status_manager.NewParserStatusManager(parsers...)
+	parserStatusManager := parsers_status_manager.NewParserStatusManager(conf, parsers...)
 
 	// Создаём менеджер парсеров
-	parserManager := parsers_manager.NewParserManager(conf, searchCache, vacancyIndex, parserStatusManager, parsers...)
+	parserManager, err := parsers_manager.NewParserManager(conf, currentMaxProcs, searchCache, vacancyIndex, parserStatusManager, parsers...)
+	if err != nil {
+		panic(err)
+	}
 
 	// Основной цикл приложения
 	scanner := bufio.NewScanner(os.Stdin)
@@ -80,6 +89,7 @@ func main() {
 				continue
 			}
 		case "3":
+			parserManager.Shutdown() // останавливает работу всех запущенных воркеров
 			fmt.Println("👋 До свидания!")
 			return
 		default:

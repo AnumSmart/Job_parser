@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"parser/internal/domain/models"
+	"time"
 )
 
+/*
 func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
 	var results []models.SearchResult
 
@@ -18,6 +20,40 @@ func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams
 
 	// Обрабатываем ошибки Circuit Breaker
 	return pm.handleSearchResult(results, err, params)
+}
+*/
+
+func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
+	// Создаем канал для получения результата
+	resultChan := make(chan *models.JobResult, 1)
+
+	// Создаем задание
+	job := &models.SearchJob{
+		ID:         "1",
+		Params:     params,
+		ResultChan: resultChan,
+		CreatedAt:  time.Now(),
+	}
+
+	// Пытаемся добавить в очередь с таймаутом
+	select {
+	case <-time.After(5 * time.Second):
+		return nil, fmt.Errorf("❌ Очередь заданий переполнена, попробуйте позже")
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		pm.jobQueue.Enqueue(job)
+	}
+
+	// Ждем результата с таймаутом
+	select {
+	case result := <-resultChan:
+		return result.Results, result.Error
+	case <-time.After(30 * time.Second):
+		return nil, fmt.Errorf("❌ Таймаут выполнения поиска")
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // Основная логика поиска

@@ -13,10 +13,11 @@ import (
 )
 
 type Config struct {
-	API     APIConfig
-	Cache   *CacheConfig
-	Parsers *ParsersConfig
-	Manager *ParserManagerConfig
+	API         APIConfig
+	Cache       *CachesConfig
+	Parsers     *ParsersConfig
+	Manager     *ParserManagerConfig
+	HealthChech *HealthCheckConfig
 }
 
 type APIConfig struct {
@@ -36,7 +37,7 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
-	cacheConfig, err := LoadYAMLConfig[CacheConfig](os.Getenv("CACHE_CONFIG_ADDRESS_STRING"), DefaultCacheConfig)
+	cacheConfig, err := LoadYAMLConfig[CachesConfig](os.Getenv("CACHES_CONFIG_ADDRESS_STRING"), DefaultCacheConfig)
 	if err != nil {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
@@ -51,33 +52,48 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
+	healthCheckConfig, err := LoadYAMLConfig[HealthCheckConfig](os.Getenv("HEALTH_CHECK_CONFIG_ADDRESS_STRING"), DefaultHealthCheckConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
+	}
+
 	return &Config{
 		API: APIConfig{
 			ConcSearchTimeout: time.Duration(concSearchTimeOut) * time.Second,
 		},
-		Cache:   cacheConfig,
-		Parsers: parsersConfig,
-		Manager: parsersManagerConfig,
+		Cache:       cacheConfig,
+		Parsers:     parsersConfig,
+		Manager:     parsersManagerConfig,
+		HealthChech: healthCheckConfig,
 	}, nil
 }
 
 // универсальня функция загрузки конфига из .yml файла (используем дженерики, так как будут ещё парсеры)
+// fn - функция конструктор конфига
 func LoadYAMLConfig[T any](configPath string, fn func() *T) (*T, error) {
+	// Вызываем переданную функцию-конструктор для создания экземпляра конфигурации.
+	// На этом этапе в config будут значения по умолчанию, заданные в конструкторе.
+	// Это важно, так как если файл конфигурации отсутствует или пуст,
+	// у нас всё равно будет работоспособная конфигурация.
 	config := fn()
 
+	// Если configPath == "" (пустая строка), сразу возвращаются дефолтные значения.
 	if configPath == "" {
 		return config, nil
 	}
 
+	// Если файл по указанному пути не существует, возвращаются дефолтные значения БЕЗ ошибки.
 	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 		return config, nil
 	}
 
+	// Если файл существует, но его не удалось прочитать или распарсить — возвращается ошибка.
 	yamlFile, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
 	}
 
+	// пробуем анмаршалить конфиг из yml файла в структуру нужного типа
 	if err := yaml.Unmarshal(yamlFile, &config); err != nil {
 		return nil, err
 	}

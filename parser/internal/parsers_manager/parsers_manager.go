@@ -2,36 +2,101 @@
 package parsers_manager
 
 import (
+	"errors"
+	"math"
 	"parser/configs"
 	"parser/internal/circuitbreaker"
+	"parser/internal/domain/models"
 	"parser/internal/inmemory_cache"
 	"parser/internal/interfaces"
-	"parser/internal/parsers_status_manager"
+	"parser/internal/queue"
+	"sync"
+	"time"
 )
 
+// структура менеджера парсеров
 type ParsersManager struct {
-	parsers              []interfaces.Parser                         // парсеры, которыми оперирует мэнеджер
-	config               *configs.Config                             // общий конфиг
-	searchCache          *inmemory_cache.InmemoryShardedCache        // поисковый кэш
-	vacancyIndex         *inmemory_cache.InmemoryShardedCache        // кэш для обратного индекса
-	parsersStatusManager *parsers_status_manager.ParserStatusManager // менеджер сотсояний парверов внутри менеджера
-	circuitBreaker       interfaces.CBInterface                      // глобальный circut breaker
+	parsers              []interfaces.Parser                  // парсеры, которыми оперирует мэнеджер
+	config               *configs.Config                      // общий конфиг
+	searchCache          *inmemory_cache.InmemoryShardedCache // поисковый кэш
+	vacancyIndex         *inmemory_cache.InmemoryShardedCache // кэш для обратного индекса
+	parsersStatusManager interfaces.ParsersStatusManager      // менеджер сотсояний парверов внутри менеджера
+	circuitBreaker       interfaces.CBInterface               // глобальный circut breaker (используем интерфейс)
+
+	// Поля для управления нагрузкой --------------------------------------------------------------------------
+	semaphore          chan struct{}                                    // Семафор для ограничения одновременных запросов
+	jobQueue           interfaces.FIFOQueueInterface[*models.SearchJob] // Очередь заданий (в качестве типа используем интерфейс с дженеником)
+	workers            int                                              // Количество воркеров
+	stopWorkers        chan struct{}                                    // Сигнал остановки воркеров (когда захотим завершить все воркеры - зкрываем канал)
+	semaSlotGetTimeout time.Duration                                    // таймаут ожидания свободного слота глобального семафора менеджера парсеров
+	wg                 sync.WaitGroup                                   // Для graceful shutdown
+	mu                 sync.RWMutex                                     // Для потокобезопасности
+	// --------------------------------------------------------------------------------------------------------
+}
+
+// структура параметров для системы управления нагрузкой менеджера парсеров
+type PMLoad struct {
+	numOfWorkers   int           // количество воркеров для очереди менеджера парсеров
+	semaphoreSize  int           // размер глобального семафора для мэнеджера парсеров
+	queueSize      int           // размер очереди для менеджера парсеров
+	semSlotTimeout time.Duration // таймаут ожидания свододного слота семафора для воркера
+}
+
+// конструктор для системы управления нагрузкой менеджера парсеров
+func NewPMLoad(numCPUCores int) *PMLoad {
+	numOfWorkers := numCPUCores * 2                                // рассчитываем количество воркеров относительно доступных ядер на машине
+	semaphoreSize := int(math.Ceil(0.7 * (float64(numOfWorkers)))) // рассчитываем размер семафора (70-80% от количества workers)
+	queueSize := semaphoreSize * 3                                 // рассчитываем размер очереди: размер семафора * 3
+
+	return &PMLoad{
+		numOfWorkers:   numOfWorkers,
+		semaphoreSize:  semaphoreSize,
+		queueSize:      queueSize,
+		semSlotTimeout: 200 * time.Millisecond, // таймаут для получения свободного слота у семафора отдельным воркером
+	}
 }
 
 // Конструктор для мэнеджера парсинга из разных источников
 func NewParserManager(config *configs.Config,
+	numCPUCores int,
 	searchCache *inmemory_cache.InmemoryShardedCache,
 	vacancyIndex *inmemory_cache.InmemoryShardedCache,
-	pStatManager *parsers_status_manager.ParserStatusManager,
-	parsers ...interfaces.Parser) *ParsersManager {
-	return &ParsersManager{
+	pStatManager interfaces.ParsersStatusManager,
+	parsers ...interfaces.Parser) (*ParsersManager, error) {
+
+	// запускаем конструктор параметров для управления нагрузкой в парсер менеджере
+	pmLoad := NewPMLoad(numCPUCores)
+
+	// Валидация
+	if pStatManager == nil {
+		return nil, errors.New("ParsersStatusManager обязателен")
+	}
+	if len(parsers) == 0 {
+		return nil, errors.New("нужен хотя бы один парсер")
+	}
+	if searchCache == nil || vacancyIndex == nil {
+		return nil, errors.New("кэши обязательны")
+	}
+
+	pm := &ParsersManager{
 		parsers:              parsers,
 		config:               config,
 		searchCache:          searchCache,
 		vacancyIndex:         vacancyIndex,
 		parsersStatusManager: pStatManager,
 		circuitBreaker:       circuitbreaker.NewCircutBreaker(config.Manager.CircuitBreakerCfg),
+		workers:              pmLoad.numOfWorkers,
+		semaphore:            make(chan struct{}, pmLoad.semaphoreSize),
+		jobQueue:             queue.NewFIFOQueue[*models.SearchJob](pmLoad.queueSize), // создаём очередь через конструктор
+		stopWorkers:          make(chan struct{}),
+		semaSlotGetTimeout:   pmLoad.semSlotTimeout,
+		// wg и mu автоматически инициализируются нулевыми значениями
 	}
+
+	// Запускаем воркеры для обработки очереди
+	pm.startWorkers()
+
+	return pm, nil
 }
 
 // GetAllParsers возвращает список доступных парсеров
