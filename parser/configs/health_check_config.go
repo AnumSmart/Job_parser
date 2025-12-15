@@ -22,7 +22,7 @@ func DefaultHealthCheckConfig() *HealthCheckConfig {
 	return &HealthCheckConfig{
 		RequestTimeOut:         5 * time.Second,
 		Initialization_timeout: 10 * time.Second,
-		HealthCheckInterval:    60 * time.Second,
+		HealthCheckInterval:    15 * time.Second,
 		HealthCheckClientConfig: HealthCheckClientConfig{
 			TimeOut:               5 * time.Second,
 			MaxIdleConns:          10,
