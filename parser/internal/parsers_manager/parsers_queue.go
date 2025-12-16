@@ -8,15 +8,15 @@ import (
 )
 
 // Запуск воркеров для обработки очереди
-func (pm *ParsersManager) startWorkers() {
+func (pm *ParsersManager) startSearchWorkers() {
 	for i := 0; i < pm.workers; i++ {
 		pm.wg.Add(1)
-		go pm.worker(i)
+		go pm.searchWorker(i)
 	}
 }
 
 // метод, описывающий работу отдельного воркера. Воркер пытется забрать работу из очереди и обработать её
-func (pm *ParsersManager) worker(id int) {
+func (pm *ParsersManager) searchWorker(id int) {
 	defer pm.wg.Done()
 
 	for {
@@ -26,7 +26,7 @@ func (pm *ParsersManager) worker(id int) {
 			//fmt.Printf("Worker #%d: received stop signal\n", id)
 			return
 		default:
-			job, ok := pm.jobQueue.Dequeue()
+			job, ok := pm.jobSearchQueue.Dequeue()
 			if ok {
 				fmt.Printf("woker #%d - взял задачу из очереди и начал обработку\n", id)
 				pm.proccessJob(job)
@@ -36,7 +36,7 @@ func (pm *ParsersManager) worker(id int) {
 }
 
 // метод обработки работы для воркера
-func (pm *ParsersManager) proccessJob(job *models.SearchJob) {
+func (pm *ParsersManager) proccessJob(job *models.SearchVacanciesJob) {
 	var results []models.SearchResult
 	var err error
 
@@ -61,7 +61,7 @@ func (pm *ParsersManager) proccessJob(job *models.SearchJob) {
 
 	// Отправляем результат
 	select {
-	case job.ResultChan <- &models.JobResult{
+	case job.ResultChan <- &models.JobSearchVacanciesResult{
 		Results: results,
 		Error:   err,
 	}:
