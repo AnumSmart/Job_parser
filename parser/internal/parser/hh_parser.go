@@ -135,6 +135,8 @@ func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vaca
 			Description: hhvacancy.Description,
 		}
 	}
+
+	fmt.Printf("First found vavancy:%s, description:%s\n", universalVacancies[0].Job, universalVacancies[0].Description)
 	return universalVacancies, nil
 }
 

@@ -36,6 +36,9 @@ func main() {
 	//создаём экземпляр inmemory cache для обратного индекса для вакансий
 	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheConfig.VacancyCacheCleanUp)
 
+	// создаём экземпляр inmemory cache для деталей конкретной вакансии (ключ: ID вакансии)
+	vacancyDetails := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheConfig.VacancyCacheCleanUp)
+
 	//создаём фабрику парсеров
 	ParserFactory := parser.NewParserFactory()
 
@@ -57,7 +60,7 @@ func main() {
 	parserStatusManager := parsers_status_manager.NewParserStatusManager(conf, parsers...)
 
 	// Создаём менеджер парсеров
-	parserManager, err := parsers_manager.NewParserManager(conf, currentMaxProcs, searchCache, vacancyIndex, parserStatusManager, parsers...)
+	parserManager, err := parsers_manager.NewParserManager(conf, currentMaxProcs, searchCache, vacancyIndex, vacancyDetails, parserStatusManager, parsers...)
 	if err != nil {
 		panic(err)
 	}
@@ -89,6 +92,12 @@ func main() {
 				continue
 			}
 		case "3":
+			err := parserManager.GetFullVacancyDetails(scanner)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+		case "4":
 			parserManager.Shutdown() // останавливает работу всех запущенных воркеров
 			fmt.Println("👋 До свидания!")
 			return
@@ -103,6 +112,7 @@ func main() {
 func printMenu() {
 	fmt.Println("📋 Меню:")
 	fmt.Println("1. Поиск вакансий (расширенный)")
-	fmt.Println("2. Получить детали вакансии по ID ")
-	fmt.Println("3. Выход")
+	fmt.Println("2. Получить описание вакансии по ID ")
+	fmt.Println("3. Получить полное описание вакансии по ID ")
+	fmt.Println("4. Выход")
 }

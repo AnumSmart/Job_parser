@@ -20,17 +20,18 @@ type ParsersManager struct {
 	config               *configs.Config                      // общий конфиг
 	searchCache          *inmemory_cache.InmemoryShardedCache // поисковый кэш
 	vacancyIndex         *inmemory_cache.InmemoryShardedCache // кэш для обратного индекса
+	vacancyDetails       *inmemory_cache.InmemoryShardedCache // кэш для деталей вакансии
 	parsersStatusManager interfaces.ParsersStatusManager      // менеджер сотсояний парверов внутри менеджера
 	circuitBreaker       interfaces.CBInterface               // глобальный circut breaker (используем интерфейс)
 
 	// Поля для управления нагрузкой --------------------------------------------------------------------------
-	semaphore          chan struct{}                                    // Семафор для ограничения одновременных запросов
-	jobQueue           interfaces.FIFOQueueInterface[*models.SearchJob] // Очередь заданий (в качестве типа используем интерфейс с дженеником)
-	workers            int                                              // Количество воркеров
-	stopWorkers        chan struct{}                                    // Сигнал остановки воркеров (когда захотим завершить все воркеры - зкрываем канал)
-	semaSlotGetTimeout time.Duration                                    // таймаут ожидания свободного слота глобального семафора менеджера парсеров
-	wg                 sync.WaitGroup                                   // Для graceful shutdown
-	mu                 sync.RWMutex                                     // Для потокобезопасности
+	semaphore          chan struct{}                                             // Семафор для ограничения одновременных запросов
+	jobSearchQueue     interfaces.FIFOQueueInterface[*models.SearchVacanciesJob] // Очередь заданий (в качестве типа используем интерфейс с дженеником)
+	workers            int                                                       // Количество воркеров
+	stopWorkers        chan struct{}                                             // Сигнал остановки воркеров (когда захотим завершить все воркеры - зкрываем канал)
+	semaSlotGetTimeout time.Duration                                             // таймаут ожидания свободного слота глобального семафора менеджера парсеров
+	wg                 sync.WaitGroup                                            // Для graceful shutdown
+	mu                 sync.RWMutex                                              // Для потокобезопасности
 	// --------------------------------------------------------------------------------------------------------
 }
 
@@ -61,6 +62,7 @@ func NewParserManager(config *configs.Config,
 	numCPUCores int,
 	searchCache *inmemory_cache.InmemoryShardedCache,
 	vacancyIndex *inmemory_cache.InmemoryShardedCache,
+	vacancyDetails *inmemory_cache.InmemoryShardedCache,
 	pStatManager interfaces.ParsersStatusManager,
 	parsers ...interfaces.Parser) (*ParsersManager, error) {
 
@@ -74,27 +76,28 @@ func NewParserManager(config *configs.Config,
 	if len(parsers) == 0 {
 		return nil, errors.New("нужен хотя бы один парсер")
 	}
-	if searchCache == nil || vacancyIndex == nil {
+	if searchCache == nil || vacancyIndex == nil || vacancyDetails == nil {
 		return nil, errors.New("кэши обязательны")
 	}
 
 	pm := &ParsersManager{
 		parsers:              parsers,
 		config:               config,
-		searchCache:          searchCache,
-		vacancyIndex:         vacancyIndex,
+		searchCache:          searchCache,    // кэш для поиска
+		vacancyIndex:         vacancyIndex,   // кэш для обратного индекса
+		vacancyDetails:       vacancyDetails, // кэш для деталей отдельной вакансии
 		parsersStatusManager: pStatManager,
 		circuitBreaker:       circuitbreaker.NewCircutBreaker(config.Manager.CircuitBreakerCfg),
 		workers:              pmLoad.numOfWorkers,
 		semaphore:            make(chan struct{}, pmLoad.semaphoreSize),
-		jobQueue:             queue.NewFIFOQueue[*models.SearchJob](pmLoad.queueSize), // создаём очередь через конструктор
+		jobSearchQueue:       queue.NewFIFOQueue[*models.SearchVacanciesJob](pmLoad.queueSize), // создаём очередь через конструктор
 		stopWorkers:          make(chan struct{}),
 		semaSlotGetTimeout:   pmLoad.semSlotTimeout,
 		// wg и mu автоматически инициализируются нулевыми значениями
 	}
 
 	// Запускаем воркеры для обработки очереди
-	pm.startWorkers()
+	pm.startSearchWorkers()
 
 	return pm, nil
 }

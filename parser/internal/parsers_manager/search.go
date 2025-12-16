@@ -25,10 +25,10 @@ func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams
 
 func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
 	// Создаем канал для получения результата
-	resultChan := make(chan *models.JobResult, 1)
+	resultChan := make(chan *models.JobSearchVacanciesResult, 1)
 
 	// Создаем задание
-	job := &models.SearchJob{
+	job := &models.SearchVacanciesJob{
 		ID:         "1",
 		Params:     params,
 		ResultChan: resultChan,
@@ -42,7 +42,7 @@ func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
-		pm.jobQueue.Enqueue(job)
+		pm.jobSearchQueue.Enqueue(job)
 	}
 
 	// Ждем результата с таймаутом
