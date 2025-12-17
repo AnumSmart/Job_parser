@@ -26,11 +26,19 @@ type Vacancy struct {
 	Description string
 }
 
-// Структура для определния результатов поиска
-type SearchResult struct {
+// Структура для определния результатов поиска списка вакансий по всем доступным парсерам
+type SearchVacanciesResult struct {
+	Vacancies  []Vacancy
 	ParserName string
 	SearchHash string
-	Vacancies  []Vacancy
 	Error      error
 	Duration   time.Duration
+}
+
+type SearchVacancyDetailesResult struct {
+	ParserName string
+	VacancyID  string
+	Error      error
+	Duration   time.Duration
+	Vacancy    Vacancy
 }

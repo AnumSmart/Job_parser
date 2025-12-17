@@ -23,7 +23,7 @@ func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams
 }
 */
 
-func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
+func (pm *ParsersManager) searchVacancies(ctx context.Context, params models.SearchParams) ([]models.SearchVacanciesResult, error) {
 	// Создаем канал для получения результата
 	resultChan := make(chan *models.JobSearchVacanciesResult, 1)
 
@@ -56,8 +56,8 @@ func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams
 	}
 }
 
-// Основная логика поиска
-func (pm *ParsersManager) executeSearch(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
+// Основная логика поиска списка вакансий по всем доступным парсерам
+func (pm *ParsersManager) executeSearch(ctx context.Context, params models.SearchParams) ([]models.SearchVacanciesResult, error) {
 
 	// Проверяем кэш
 	if cachedResults, found := pm.tryGetFromCache(params); found {
@@ -94,8 +94,8 @@ func (pm *ParsersManager) executeSearch(ctx context.Context, params models.Searc
 }
 
 // Формируем слайс стркутур, где поиск прошёл без ошибок
-func (pm *ParsersManager) filterSuccessfulResults(results []models.SearchResult) []models.SearchResult {
-	var successful []models.SearchResult
+func (pm *ParsersManager) filterSuccessfulResults(results []models.SearchVacanciesResult) []models.SearchVacanciesResult {
+	var successful []models.SearchVacanciesResult
 	for _, result := range results {
 		if result.Error == nil && len(result.Vacancies) > 0 {
 			successful = append(successful, result)

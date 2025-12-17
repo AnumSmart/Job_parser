@@ -12,6 +12,6 @@ type SearchJob struct {
 
 // Структура результата по выполнении работы
 type JobResult struct {
-	Results []SearchResult
+	Results []SearchVacanciesResult
 	Error   error
 }

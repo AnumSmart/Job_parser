@@ -6,7 +6,6 @@ import (
 	"math"
 	"parser/configs"
 	"parser/internal/circuitbreaker"
-	"parser/internal/domain/models"
 	"parser/internal/inmemory_cache"
 	"parser/internal/interfaces"
 	"parser/internal/queue"
@@ -25,13 +24,13 @@ type ParsersManager struct {
 	circuitBreaker       interfaces.CBInterface               // глобальный circut breaker (используем интерфейс)
 
 	// Поля для управления нагрузкой --------------------------------------------------------------------------
-	semaphore          chan struct{}                                             // Семафор для ограничения одновременных запросов
-	jobSearchQueue     interfaces.FIFOQueueInterface[*models.SearchVacanciesJob] // Очередь заданий (в качестве типа используем интерфейс с дженеником)
-	workers            int                                                       // Количество воркеров
-	stopWorkers        chan struct{}                                             // Сигнал остановки воркеров (когда захотим завершить все воркеры - зкрываем канал)
-	semaSlotGetTimeout time.Duration                                             // таймаут ожидания свободного слота глобального семафора менеджера парсеров
-	wg                 sync.WaitGroup                                            // Для graceful shutdown
-	mu                 sync.RWMutex                                              // Для потокобезопасности
+	semaphore          chan struct{}                                 // Семафор для ограничения одновременных запросов
+	jobSearchQueue     interfaces.FIFOQueueInterface[interfaces.Job] // Очередь заданий (в качестве типа используем интерфейс с дженеником)
+	workers            int                                           // Количество воркеров
+	stopWorkers        chan struct{}                                 // Сигнал остановки воркеров (когда захотим завершить все воркеры - зкрываем канал)
+	semaSlotGetTimeout time.Duration                                 // таймаут ожидания свободного слота глобального семафора менеджера парсеров
+	wg                 sync.WaitGroup                                // Для graceful shutdown
+	mu                 sync.RWMutex                                  // Для потокобезопасности
 	// --------------------------------------------------------------------------------------------------------
 }
 
@@ -90,7 +89,7 @@ func NewParserManager(config *configs.Config,
 		circuitBreaker:       circuitbreaker.NewCircutBreaker(config.Manager.CircuitBreakerCfg),
 		workers:              pmLoad.numOfWorkers,
 		semaphore:            make(chan struct{}, pmLoad.semaphoreSize),
-		jobSearchQueue:       queue.NewFIFOQueue[*models.SearchVacanciesJob](pmLoad.queueSize), // создаём очередь через конструктор
+		jobSearchQueue:       queue.NewFIFOQueue[interfaces.Job](pmLoad.queueSize), // создаём очередь через конструктор
 		stopWorkers:          make(chan struct{}),
 		semaSlotGetTimeout:   pmLoad.semSlotTimeout,
 		// wg и mu автоматически инициализируются нулевыми значениями

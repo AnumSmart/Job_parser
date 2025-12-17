@@ -8,8 +8,9 @@ import (
 	"time"
 )
 
+// метод получения информации о вакансии из кэша с помощью кэша обратного индекса
 func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
-	fmt.Println("\n📄 Детали вакансии")
+	fmt.Println("\n📄 Детали вакансии (кратко):")
 
 	// получаем ID вакансии и имя источника из ввода
 	source, vacancyID, err := pm.getCompositeIDFromInput(scanner)
@@ -48,7 +49,7 @@ func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	if ok {
 		// если можно получить данные из кэша, то получаем интерфейс.
 		// проводим type assertion, проверяем нужный тип
-		searchResChecked, ok := searchRes.([]models.SearchResult)
+		searchResChecked, ok := searchRes.([]models.SearchVacanciesResult)
 		if !ok {
 			return fmt.Errorf("Type assertion after multi-search ---> failed!\n")
 		}
@@ -121,9 +122,21 @@ func (pm *ParsersManager) GetFullVacancyDetails(scanner *bufio.Scanner) error {
 	}
 
 	// если нет данных в кэше информации по вавкансиям, то необходимо сделать новый запрос на нужный сервис с конкретным ID
+	//---------------------------------------------------------------------------
+	// тут необходимо создать джобу, которая будет удовлетворять интерфейсу, еперадть её в очередь, создать канал и из этого канала попытаться прочитать данные
+
+	//---------------------------------------------------------------------------
 
 	return fmt.Errorf("No Vacancy with ID:%s was found in vacancy details cache\n", vacancyID)
 }
+
+/*
+// метод осуществляет поиск деталей вакансии в конкретном сервисе по конкретному ID
+func (pm *ParsersManager) executeSearchVacancyDetailes(ctx context.Context, vacancyID, source string) (models.SearchVacancyDetailesResult, error) {
+	// -----------------------------------пока в разработке----------------------------------------------
+	return models.SearchVacancyDetailesResult{}, nil
+}
+*/
 
 // функция вывода в консоль данных о найденой вакансии
 func printVacancyDetails(vacancy models.VacancyDetails, description string) {
