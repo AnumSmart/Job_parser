@@ -10,6 +10,7 @@ import (
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
 	ratelimiter "parser/internal/rate_limiter"
+	"parser/pkg"
 	"time"
 )
 
@@ -75,9 +76,10 @@ func createHTTPClient(config BaseConfig) *http.Client {
 
 // ParserFuncs определяет типы специфичных функций парсера
 type ParserFuncs struct {
-	BuildURL func(models.SearchParams) (string, error)
-	Parse    func([]byte) (interface{}, error)
-	Convert  func(interface{}) ([]models.Vacancy, error)
+	BuildURL       func(models.SearchParams) (string, error)
+	Parse          func([]byte) (interface{}, error)
+	Convert        func(interface{}) ([]models.Vacancy, error)
+	ConvertDetails func(interface{}) (models.VacancyDetails, error)
 }
 
 // SearchVacancies общий метод для поиска вакансий
@@ -147,6 +149,71 @@ func (p *BaseParser) SearchVacancies(ctx context.Context, params models.SearchPa
 	}
 
 	return vacancies, nil
+}
+
+func (p *BaseParser) SearchVacanciesDetailes(ctx context.Context, vacancyID string, funcs ParserFuncs) (models.VacancyDetails, error) {
+	// формируем url поиска для базового парсера
+	searchUrl := pkg.UrlBuilder(p.baseURL, vacancyID)
+
+	// заводим переменную, в которую будем складывать результат
+	var vacancyDetails models.VacancyDetails
+
+	// Используем Circuit Breaker для выполнения запроса к внешнему сервису
+	//---------------------------------------------------------------------------------------------------
+	err := p.circuitBreaker.Execute(func() error {
+		// Обработка семафора
+		if err := p.acquireSemaphore(ctx); err != nil {
+			return err
+		}
+		defer p.releaseSemaphore() // после завершения вызова функции, освобождаем семафор
+
+		// Перед осуществлением запроса проверяем rate limiter
+		p.rateLimiter.Wait()
+
+		// Выполнение HTTP запроса
+		resp, err := p.executeRequest(ctx, searchUrl)
+		if err != nil {
+			return err
+		}
+
+		// освобождаем ресурсы
+		defer p.drainAndClose(resp)
+
+		// Проверка статуса
+		if err := p.checkResponseStatus(resp); err != nil {
+			return err
+		}
+
+		// Чтение и парсинг
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response failed: %w", err)
+		}
+
+		// парсим даные
+		parsedData, err := funcs.Parse(body)
+		if err != nil {
+			return fmt.Errorf("parse response failed: %w", err)
+		}
+
+		// пробуем сконвертировать результаты поиска к единому формату. Обязательно type assertion, на входе interface{}
+		converted, err := funcs.ConvertDetails(parsedData)
+		if err != nil {
+			return fmt.Errorf("convert to universal failed: %w", err)
+		}
+
+		vacancyDetails = converted
+
+		return nil
+	})
+	//---------------------------------------------------------------------------------------------------
+	// если ошибки есть, определяем какого они рода
+	if err != nil {
+		return models.VacancyDetails{}, err
+	}
+
+	return vacancyDetails, nil
+
 }
 
 // метод проверки доступности семафора

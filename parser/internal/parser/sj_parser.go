@@ -47,7 +47,7 @@ func NewSJParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 	}
 }
 
-// метод парсера для поиска вакансий
+// метод парсера для поиска списка вакансий
 func (p *SJParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
 	return p.BaseParser.SearchVacancies(
 		ctx,
@@ -57,6 +57,15 @@ func (p *SJParser) SearchVacancies(ctx context.Context, params models.SearchPara
 			Parse:    p.parseResponse,
 			Convert:  p.convertToUniversal,
 		},
+	)
+}
+
+// метод парсера для поиска деталей по конкретной вакансии
+func (p *SJParser) SearchVacanciesDetailes(ctx context.Context, vacancyID string) (models.VacancyDetails, error) {
+	return p.BaseParser.SearchVacanciesDetailes(
+		ctx,
+		vacancyID,
+		ParserFuncs{},
 	)
 }
 

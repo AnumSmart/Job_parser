@@ -12,6 +12,10 @@ type SearchVacanciesJob struct {
 
 // Структура результата по выполнении работы поиска списка вакансий
 type JobSearchVacanciesResult struct {
-	Results []SearchResult
+	Results []SearchVacanciesResult
 	Error   error
+}
+
+func (s *SearchVacanciesJob) GetID() string {
+	return s.ID
 }

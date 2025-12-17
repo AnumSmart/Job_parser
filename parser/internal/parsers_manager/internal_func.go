@@ -9,7 +9,7 @@ import (
 )
 
 // Метод для вывода в консоль результатов поиска (с нужными атрибутами)
-func (pm *ParsersManager) printMultiSearchResults(results []models.SearchResult, resultsPerPage int) {
+func (pm *ParsersManager) printMultiSearchResults(results []models.SearchVacanciesResult, resultsPerPage int) {
 	totalVacancies := 0
 
 	for _, result := range results {
@@ -41,7 +41,7 @@ func (pm *ParsersManager) printMultiSearchResults(results []models.SearchResult,
 }
 
 // метод для построения обратного индекса и хранения его в кэше №2 для индексов и ID вакансий
-func (pm *ParsersManager) buildReverseIndex(searchHash string, results []models.SearchResult) {
+func (pm *ParsersManager) buildReverseIndex(searchHash string, results []models.SearchVacanciesResult) {
 	for _, parserResult := range results {
 		for i, vacancy := range parserResult.Vacancies {
 			compositeID := fmt.Sprintf("%s_%s", vacancy.Seeker, vacancy.ID)
