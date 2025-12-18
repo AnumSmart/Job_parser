@@ -64,7 +64,9 @@ func (p *HHParser) SearchVacanciesDetailes(ctx context.Context, vacancyID string
 	return p.BaseParser.SearchVacanciesDetailes(
 		ctx,
 		vacancyID,
-		ParserFuncs{},
+		ParserFuncs{
+			ConvertDetails: p.convertDetails,
+		},
 	)
 }
 
@@ -116,13 +118,23 @@ func (p *HHParser) parseResponse(body []byte) (interface{}, error) {
 
 // метод приведения результатов поиска у унифицированной структуре + проверка данных их интерфейса
 func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vacancy, error) {
+	// проверка интерфейса на nil
+	if searchResponse == nil {
+		return []models.Vacancy{}, fmt.Errorf("[%s] searchResponse is nil", p.name)
+	}
+
 	// Проводим type assertion
 	searchResp, ok := searchResponse.(*model.SearchResponse)
 	if !ok {
 
 		// Для более детальной информации можно использовать reflect
 		fmt.Printf("----------------->>>[Parser name: %s] DEBUG: Type details: %v\n", p.name, reflect.TypeOf(searchResponse))
-		return nil, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name)
+		return []models.Vacancy{}, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name) // возвращаем пустой слайс
+	}
+
+	// Проверка на nil внутри структуры
+	if searchResp.Items == nil {
+		return []models.Vacancy{}, nil // Нет ошибки, просто нет данных
 	}
 
 	// сразу инициализируем слайс универсальных вакансий, чтобы уменьшить количество переаалокаций, если выйдем за размер базового массива слайса
@@ -145,8 +157,31 @@ func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vaca
 		}
 	}
 
-	fmt.Printf("First found vavancy:%s, description:%s\n", universalVacancies[0].Job, universalVacancies[0].Description)
 	return universalVacancies, nil
+}
+
+// метод приведения результатов поиска по конкретной ваансии к нужному типу + проверка данных интерфейса
+func (p *HHParser) convertDetails(detailsResponse interface{}) (models.VacancyDetails, error) {
+	// проверка интерфейса на nil
+	if detailsResponse == nil {
+		return models.VacancyDetails{}, fmt.Errorf("[%s] searchResponse is nil", p.name)
+	}
+
+	// Проводим type assertion
+	searchResp, ok := detailsResponse.(*model.SearchDetails)
+	if !ok {
+
+		// Для более детальной информации можно использовать reflect
+		fmt.Printf("----------------->>>[Parser name: %s] DEBUG: Type details: %v\n", p.name, reflect.TypeOf(searchResp))
+		return models.VacancyDetails{}, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name)
+	}
+
+	var vacDetails models.VacancyDetails
+	vacDetails.ID = searchResp.ID
+	vacDetails.Job = searchResp.Name
+	vacDetails.Experience = searchResp.Experience
+
+	return vacDetails, nil
 }
 
 // GetVacancyByID получает детальную информацию о вакансии по ID

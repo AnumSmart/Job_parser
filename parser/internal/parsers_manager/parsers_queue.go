@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"parser/internal/domain/models"
+	"parser/internal/jobs"
 	"time"
 )
 
@@ -32,9 +33,9 @@ func (pm *ParsersManager) searchWorker(id int) {
 
 				// проверяем тип джобы и вызываем соответствующий обработчик
 				switch j := job.(type) {
-				case *models.SearchVacanciesJob:
+				case *jobs.SearchJob:
 					pm.proccessSearchJob(j) // конкурентно ищем вакансии по всем доступным парсерам
-				case *models.SearchVacancyDetailesJob:
+				case *jobs.FetchDetailsJob:
 					pm.proccessDetailsJob(j) // делаем запрос в конкретный сервис по конкретному ID
 				}
 			}
@@ -43,7 +44,7 @@ func (pm *ParsersManager) searchWorker(id int) {
 }
 
 // метод обработки работы для воркера, поиск списка вакансий по всем доступным парсерам (конкурентные запросы)
-func (pm *ParsersManager) proccessSearchJob(job *models.SearchVacanciesJob) {
+func (pm *ParsersManager) proccessSearchJob(job *jobs.SearchJob) {
 	var results []models.SearchVacanciesResult
 	var err error
 
@@ -67,49 +68,56 @@ func (pm *ParsersManager) proccessSearchJob(job *models.SearchVacanciesJob) {
 	}
 
 	// Отправляем результат
-	select {
-	case job.ResultChan <- &models.JobSearchVacanciesResult{
-		Results: results,
-		Error:   err,
-	}:
-	default:
-		// Получатель не ждет результата
-	}
+
+	job.Complete(results, err)
+	/*
+		select {
+		case job.BaseJob.ResultChan <- &models.JobSearchVacanciesResult{
+			Results: results,
+			Error:   err,
+		}:
+		default:
+			// Получатель не ждет результата
+		}
+	*/
 }
 
 // метод для обработки работы для воркера, получение детальной информации по вакансии (запрос к конкретному сервису)
-func (pm *ParsersManager) proccessDetailsJob(job *models.SearchVacancyDetailesJob) {
-	var result models.SearchVacancyDetailesResult
-	var err error
+func (pm *ParsersManager) proccessDetailsJob(job *jobs.FetchDetailsJob) {
+	// нужно продумать!!!!!!!!!!!!!!!!!!!!!!!!!!
+	/*
+		var result models.SearchVacancyDetailesResult
+		var err error
 
-	select {
-	case pm.semaphore <- struct{}{}:
-		// Получили слот в семафоре менеджера парсеров
-		defer func() {
-			<-pm.semaphore // Освобождаем слот
-		}()
+		select {
+		case pm.semaphore <- struct{}{}:
+			// Получили слот в семафоре менеджера парсеров
+			defer func() {
+				<-pm.semaphore // Освобождаем слот
+			}()
 
-		// Используем глобальный Circuit Breaker
-		err = pm.circuitBreaker.Execute(func() error {
-			var err error
-			//	result, err = pm.executeSearchVacancyDetailes(context.Background(), job.VacancyID, job.ParserName)
-			return err
-		})
+			// Используем глобальный Circuit Breaker
+			err = pm.circuitBreaker.Execute(func() error {
+				var err error
+				result, err = pm.executeSearchVacancyDetailes(context.Background(), job.VacancyID, job.ParserName)
+				return err
+			})
 
-		//result, err = pm.handleSearchVacancyDetailesResult(result, err)
-	case <-time.After(pm.semaSlotGetTimeout):
-		err = fmt.Errorf("❌ Таймаут ожидания свободного слота глобального семафора менеджера парсеров")
-	}
+			//result, err = pm.handleSearchVacancyDetailesResult(result, err)
+		case <-time.After(pm.semaSlotGetTimeout):
+			err = fmt.Errorf("❌ Таймаут ожидания свободного слота глобального семафора менеджера парсеров")
+		}
 
-	// Отправляем результат
-	select {
-	case job.ResultChan <- &models.JobSearchVacancyDetailesResult{
-		Result: result,
-		Error:  err,
-	}:
-	default:
-		// Получатель не ждет результата
-	}
+		// Отправляем результат
+		select {
+		case job.ResultChan <- &models.JobSearchVacancyDetailesResult{
+			Result: result,
+			Error:  err,
+		}:
+		default:
+			// Получатель не ждет результата
+		}
+	*/
 }
 
 // метод для остановки всех воркеров

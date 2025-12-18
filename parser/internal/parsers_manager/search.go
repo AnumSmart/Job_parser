@@ -7,53 +7,72 @@ import (
 	"time"
 )
 
-/*
-func (pm *ParsersManager) search(ctx context.Context, params models.SearchParams) ([]models.SearchResult, error) {
-	var results []models.SearchResult
-
-	// Используем глобальный Circuit Breaker
-	err := pm.circuitBreaker.Execute(func() error {
-		var err error
-		results, err = pm.executeSearch(ctx, params)
-		return err
-	})
-
-	// Обрабатываем ошибки Circuit Breaker
-	return pm.handleSearchResult(results, err, params)
-}
-*/
-
+// метод менджера парсеров, который формирует джобу для поиска списка вакансий, добавляет эту джобу в очередь и получает результат поиска в канал
+// возвращает результат поиска или ошибку
 func (pm *ParsersManager) searchVacancies(ctx context.Context, params models.SearchParams) ([]models.SearchVacanciesResult, error) {
 	// Создаем канал для получения результата
-	resultChan := make(chan *models.JobSearchVacanciesResult, 1)
+	//resultChan := make(chan *jobs.JobOutput, 1)
 
 	// Создаем задание
-	job := &models.SearchVacanciesJob{
-		ID:         "1",
-		Params:     params,
-		ResultChan: resultChan,
-		CreatedAt:  time.Now(),
-	}
+	/*
+		job := &models.SearchVacanciesJob{
+			ID:         pkg.QuickUUID(),
+			Params:     params,
+			ResultChan: resultChan,
+			CreatedAt:  time.Now(),
+		}
+	*/
 
-	// Пытаемся добавить в очередь с таймаутом
-	select {
-	case <-time.After(5 * time.Second):
-		return nil, fmt.Errorf("❌ Очередь заданий переполнена, попробуйте позже")
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-		pm.jobSearchQueue.Enqueue(job)
-	}
+	job := pm.NewSearchJob(params)
 
-	// Ждем результата с таймаутом
-	select {
-	case result := <-resultChan:
-		return result.Results, result.Error
-	case <-time.After(30 * time.Second):
-		return nil, fmt.Errorf("❌ Таймаут выполнения поиска")
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	success := pm.tryEnqueueJob(ctx, job, 5*time.Second)
+
+	// Пытаемся добавить в очередь с таймаутом и повторными попытками
+
+	/*
+		start := time.Now()
+		timeout := 5 * time.Second
+
+		for {
+			// Пробуем добавить в очередь
+			if pm.jobSearchQueue.Enqueue(job) {
+				break // успешно
+			}
+
+			// Проверяем таймаут
+			if time.Since(start) > timeout {
+				close(resultChan) // Закрываем канал, чтобы не было утечек
+				return nil, fmt.Errorf("❌ Очередь заданий переполнена, попробуйте позже")
+			}
+
+			// Проверяем отмену контекста
+			select {
+			case <-ctx.Done():
+				close(resultChan)
+				return nil, ctx.Err()
+			default:
+				// Небольшая пауза перед следующей попыткой
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+	*/
+	if success {
+		// Ждем результата с таймаутом
+		select {
+		case result := <-job.ResultChan:
+			resultCheked, ok := result.Data.([]models.SearchVacanciesResult)
+			if ok {
+				return resultCheked, result.Error
+			}
+			return nil, result.Error
+
+		case <-time.After(30 * time.Second):
+			return nil, fmt.Errorf("❌ Таймаут выполнения поиска")
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
+	return nil, fmt.Errorf("❌ Джоба не была добавлена в очередь")
 }
 
 // Основная логика поиска списка вакансий по всем доступным парсерам

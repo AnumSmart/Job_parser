@@ -40,6 +40,13 @@ type SearchResponse struct {
 	Pages int         `json:"pages"`
 }
 
+type SearchDetails struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Experience string `json:"experience"`
+}
+
 // GetSalaryString возвращает форматированную строку зарплаты
 func (v HHVacancy) GetSalaryString() string {
 	if v.Salary.From == 0 && v.Salary.To == 0 {
