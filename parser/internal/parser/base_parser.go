@@ -209,7 +209,7 @@ func (p *BaseParser) SearchVacanciesDetailes(ctx context.Context, vacancyID stri
 	//---------------------------------------------------------------------------------------------------
 	// если ошибки есть, определяем какого они рода
 	if err != nil {
-		return models.VacancyDetails{}, err
+		return vacancyDetails, err
 	}
 
 	return vacancyDetails, nil

@@ -78,30 +78,6 @@ func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	return nil
 }
 
-// метод получения имени источника и ID вакансии из ввода
-func (pm *ParsersManager) getCompositeIDFromInput(scanner *bufio.Scanner) (string, string, error) {
-	fmt.Print("Введите ID вакансии: ")
-	if !scanner.Scan() {
-		return "", "", fmt.Errorf("❌ Проблема со сканированием ввода\n")
-	}
-
-	// переменная, куда сохранаяется ID искомой вакансии
-	vacancyID := strings.TrimSpace(scanner.Text())
-	if vacancyID == "" {
-		//fmt.Println("❌ ID вакансии не может быть пустым")
-		return "", "", fmt.Errorf("❌ ID вакансии не может быть пустым\n")
-	}
-
-	fmt.Print("Введите источник (HH.ru/SuperJob.ru): ")
-	if !scanner.Scan() {
-		return "", "", fmt.Errorf("❌ ввели неверное имя сервиса\n")
-	}
-	// переменная, куда кладём имя сервиса, в результатах поиска которого будем искать ID вакансии
-	source := strings.TrimSpace(scanner.Text())
-
-	return source, vacancyID, nil
-}
-
 // метод для получения полной информации по отдельной вакансии по ID
 func (pm *ParsersManager) GetFullVacancyDetails(scanner *bufio.Scanner) error {
 	// получаем ID вакансии и имя источника из ввода
@@ -137,6 +113,30 @@ func (pm *ParsersManager) executeSearchVacancyDetailes(ctx context.Context, vaca
 	return models.SearchVacancyDetailesResult{}, nil
 }
 */
+
+// метод получения имени источника и ID вакансии из ввода
+func (pm *ParsersManager) getCompositeIDFromInput(scanner *bufio.Scanner) (string, string, error) {
+	fmt.Print("Введите ID вакансии: ")
+	if !scanner.Scan() {
+		return "", "", fmt.Errorf("❌ Проблема со сканированием ввода\n")
+	}
+
+	// переменная, куда сохранаяется ID искомой вакансии
+	vacancyID := strings.TrimSpace(scanner.Text())
+	if vacancyID == "" {
+		//fmt.Println("❌ ID вакансии не может быть пустым")
+		return "", "", fmt.Errorf("❌ ID вакансии не может быть пустым\n")
+	}
+
+	fmt.Print("Введите источник (HH.ru/SuperJob.ru): ")
+	if !scanner.Scan() {
+		return "", "", fmt.Errorf("❌ ввели неверное имя сервиса\n")
+	}
+	// переменная, куда кладём имя сервиса, в результатах поиска которого будем искать ID вакансии
+	source := strings.TrimSpace(scanner.Text())
+
+	return source, vacancyID, nil
+}
 
 // функция вывода в консоль данных о найденой вакансии
 func printVacancyDetails(vacancy models.VacancyDetails, description string) {
