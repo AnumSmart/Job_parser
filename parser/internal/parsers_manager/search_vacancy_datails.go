@@ -2,8 +2,10 @@ package parsers_manager
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"parser/internal/domain/models"
+	"parser/internal/interfaces"
 	"strings"
 	"time"
 )
@@ -70,7 +72,7 @@ func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 		}
 	} else {
 		pm.vacancyIndex.DeleteItem(compositeID)
-		return fmt.Errorf("Search data --- expired!\n")
+		return fmt.Errorf("Данные устарели, сделайте повторный запрос (пункт меню 1)\n")
 	}
 
 	printVacancyDetails(targetVacancy, "нужно выбрать в меню --- полное описание вакансии по ID")
@@ -81,38 +83,78 @@ func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 // метод для получения полной информации по отдельной вакансии по ID
 func (pm *ParsersManager) GetFullVacancyDetails(scanner *bufio.Scanner) error {
 	// получаем ID вакансии и имя источника из ввода
-	_, vacancyID, err := pm.getCompositeIDFromInput(scanner)
+	source, vacancyID, err := pm.getCompositeIDFromInput(scanner)
 	if err != nil {
 		return err
 	}
 
-	// пытаемся найти информацию по ID вакансии в кэше для деталей отдельной вакансии
-	searchResVacDet, exists := pm.vacancyDetails.GetItem(vacancyID)
-	if exists {
-		searchResVacDetChecked, ok := searchResVacDet.(models.VacancyDetails)
-		if !ok {
-			fmt.Println("Type assertion after GetVacancyDetails from cache ---> failed!")
-			return fmt.Errorf("Type assertion after GetVacancyDetails from cache ---> failed!\n")
-		}
-		printVacancyDetails(searchResVacDetChecked, "")
+	ctx := context.Background()
+
+	result, err := pm.executeSearchVacancyDetailes(ctx, vacancyID, source)
+	if err != nil {
+		return err
 	}
 
-	// если нет данных в кэше информации по вавкансиям, то необходимо сделать новый запрос на нужный сервис с конкретным ID
-	//---------------------------------------------------------------------------
-	// тут необходимо создать джобу, которая будет удовлетворять интерфейсу, еперадть её в очередь, создать канал и из этого канала попытаться прочитать данные
+	// делаем несколько проверок. Проверка на nil результат, проверка на пустой слайс
 
-	//---------------------------------------------------------------------------
-
-	return fmt.Errorf("No Vacancy with ID:%s was found in vacancy details cache\n", vacancyID)
+	// ----------------------------------------- нужно додумать!!!
+	fmt.Println(result)
+	return nil
 }
 
-/*
-// метод осуществляет поиск деталей вакансии в конкретном сервисе по конкретному ID
+// метод менджера парсеров, который формирует джобу для поиска деталей по конкретной вакансии, добавляет эту джобу в очередь и получает результат поиска в канал
+// возвращает результат поиска или ошибку
 func (pm *ParsersManager) executeSearchVacancyDetailes(ctx context.Context, vacancyID, source string) (models.SearchVacancyDetailesResult, error) {
-	// -----------------------------------пока в разработке----------------------------------------------
-	return models.SearchVacancyDetailesResult{}, nil
+	// создаём новую джобу необходимого типа (в данном случае джоба поиска расширенной инфы по конкретной вакансии)
+	job := pm.NewFetchVacancyJob(source, vacancyID)
+
+	// Пытаемся добавить в очередь с таймаутом и повторными попытками
+	success := pm.tryEnqueueJob(ctx, job, 5*time.Second)
+
+	// проверяем успешность добавления в очередь
+	if !success {
+		return models.SearchVacancyDetailesResult{}, fmt.Errorf("❌ Джоба не была добавлена в очередь")
+	}
+
+	// дожидаемся результатов из очереди с учётом таймаута
+	result, err := pm.waitForJobSearchVacancyDeyailsResult(ctx, job.ResultChan, 30*time.Second)
+
+	// специально тут не обрабатываем ошибку, они уже обработаны выше
+	return result, err
 }
-*/
+
+// Основная логика поиска деталей конкретной вакансии
+func (pm *ParsersManager) searchVacancyDetailes(ctx context.Context, vacancyID, source string) (models.SearchVacancyDetailesResult, error) {
+	// Проверяем кэш деталей вакансии
+	// пытаемся найти в кэше данные по заданному хэш ключу
+	cached, found := pm.vacancyDetails.GetItem(vacancyID)
+	if found {
+		// необходим type assertion
+		checkedCached, ok := cached.(models.SearchVacancyDetailesResult)
+		if !ok {
+			return models.SearchVacancyDetailesResult{}, fmt.Errorf("⚠️  Type assertion для кэшированных данных деталей вакансии -  не удался\n")
+		}
+		return checkedCached, nil
+	}
+
+	// если в кэше ничего не было найдно, то выполняем запрос в конкретном парсере
+	var parserForRequest interfaces.Parser
+	//выбираем нужный парсер
+	for _, parser := range pm.parsers {
+		if parser.GetName() == source {
+			parserForRequest = parser
+			break
+		}
+	}
+
+	vacancyDetails, err := parserForRequest.SearchVacanciesDetailes(ctx, vacancyID)
+	if err != nil {
+		return models.SearchVacancyDetailesResult{}, err
+	}
+
+	return vacancyDetails, nil
+
+}
 
 // метод получения имени источника и ID вакансии из ввода
 func (pm *ParsersManager) getCompositeIDFromInput(scanner *bufio.Scanner) (string, string, error) {

@@ -68,56 +68,36 @@ func (pm *ParsersManager) proccessSearchJob(job *jobs.SearchJob) {
 	}
 
 	// Отправляем результат
-
 	job.Complete(results, err)
-	/*
-		select {
-		case job.BaseJob.ResultChan <- &models.JobSearchVacanciesResult{
-			Results: results,
-			Error:   err,
-		}:
-		default:
-			// Получатель не ждет результата
-		}
-	*/
 }
 
 // метод для обработки работы для воркера, получение детальной информации по вакансии (запрос к конкретному сервису)
 func (pm *ParsersManager) proccessDetailsJob(job *jobs.FetchDetailsJob) {
-	// нужно продумать!!!!!!!!!!!!!!!!!!!!!!!!!!
-	/*
-		var result models.SearchVacancyDetailesResult
-		var err error
 
-		select {
-		case pm.semaphore <- struct{}{}:
-			// Получили слот в семафоре менеджера парсеров
-			defer func() {
-				<-pm.semaphore // Освобождаем слот
-			}()
+	var result models.SearchVacancyDetailesResult
+	var err error
 
-			// Используем глобальный Circuit Breaker
-			err = pm.circuitBreaker.Execute(func() error {
-				var err error
-				result, err = pm.executeSearchVacancyDetailes(context.Background(), job.VacancyID, job.ParserName)
-				return err
-			})
+	select {
+	case pm.semaphore <- struct{}{}:
+		// Получили слот в семафоре менеджера парсеров
+		defer func() {
+			<-pm.semaphore // Освобождаем слот
+		}()
 
-			//result, err = pm.handleSearchVacancyDetailesResult(result, err)
-		case <-time.After(pm.semaSlotGetTimeout):
-			err = fmt.Errorf("❌ Таймаут ожидания свободного слота глобального семафора менеджера парсеров")
-		}
+		// Используем глобальный Circuit Breaker
+		err = pm.circuitBreaker.Execute(func() error {
+			var err error
+			result, err = pm.searchVacancyDetailes(context.Background(), job.VacancyID, job.Source)
+			return err
+		})
 
-		// Отправляем результат
-		select {
-		case job.ResultChan <- &models.JobSearchVacancyDetailesResult{
-			Result: result,
-			Error:  err,
-		}:
-		default:
-			// Получатель не ждет результата
-		}
-	*/
+		//result, err = pm.handleSearchVacancyDetailesResult(result, err)
+	case <-time.After(pm.semaSlotGetTimeout):
+		err = fmt.Errorf("❌ Таймаут ожидания свободного слота глобального семафора менеджера парсеров")
+	}
+
+	// Отправляем результат
+	job.Complete(result, err)
 }
 
 // метод для остановки всех воркеров
