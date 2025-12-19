@@ -40,6 +40,7 @@ type SearchResponse struct {
 	Pages int         `json:"pages"`
 }
 
+// предоставляет ответ API HH.ru по запросу с ID
 type SearchDetails struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`

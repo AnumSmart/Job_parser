@@ -35,6 +35,7 @@ type SearchVacanciesResult struct {
 	Duration   time.Duration
 }
 
+// Структура для определния результатов поиска деталей конкретной вакансии
 type SearchVacancyDetailesResult struct {
 	ParserName string
 	VacancyID  string

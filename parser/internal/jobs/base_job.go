@@ -22,6 +22,7 @@ type BaseJob struct {
 	notified   sync.Once
 }
 
+// метод у структуры джоб, который отправляет результат в результирующий канал
 func (j *BaseJob) Complete(data interface{}, err error) {
 	j.notified.Do(func() {
 		defer func() {

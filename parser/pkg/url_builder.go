@@ -8,7 +8,7 @@ func UrlBuilder(url, id string) string {
 	builder.Grow(2) // Оптимизация производительности (так как у нас 2 строки)
 	builder.WriteString(url)
 	builder.WriteString("/")
-	builder.WriteString(url)
+	builder.WriteString(id)
 
 	return builder.String()
 }
