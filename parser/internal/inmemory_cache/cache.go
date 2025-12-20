@@ -35,7 +35,7 @@ func NewInmemoryShardedCache(numShards int, cleanUpInterval time.Duration) *Inme
 // результатом будет значение в CashItem и флаг
 func (c *InmemoryShardedCache) GetItem(key string) (interface{}, bool) {
 	// получаем необходимый шард
-	shard := c.GetShard(key)
+	shard := c.getShard(key)
 	now := time.Now()
 	// лочимся на чтение, так как читаем из мапы
 	shard.mu.RLock()
@@ -55,7 +55,7 @@ func (c *InmemoryShardedCache) GetItem(key string) (interface{}, bool) {
 }
 
 // метод, чтобы находить нужный шард по заданному ключу
-func (c *InmemoryShardedCache) GetShard(key string) *Shard {
+func (c *InmemoryShardedCache) getShard(key string) *Shard {
 	// создаём экземпляр хэша
 	hashf := fnv.New32a()
 	//записываем в хэш наш ключ в виде байтового среза
@@ -74,7 +74,7 @@ func (c *InmemoryShardedCache) GetShard(key string) *Shard {
 // метод, чтобы записать значение в кэш с заданным TTL
 func (c *InmemoryShardedCache) AddItemWithTTL(key string, value interface{}, ttl time.Duration) {
 	// получаем необходимый шард
-	shard := c.GetShard(key)
+	shard := c.getShard(key)
 	now := time.Now()
 
 	// берём лок на запись, так как обращаемся к мапе

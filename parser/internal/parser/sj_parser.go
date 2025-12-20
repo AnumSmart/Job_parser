@@ -47,20 +47,32 @@ func NewSJParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 	}
 }
 
-// метод парсера для поиска вакансий
+// метод парсера для поиска списка вакансий
 func (p *SJParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
 	return p.BaseParser.SearchVacancies(
 		ctx,
 		params,
 		ParserFuncs{
 			BuildURL: p.buildURL,
-			Parse:    p.parseResponse,
+			Parse:    p.parseResponseSearchVacancies,
 			Convert:  p.convertToUniversal,
 		},
 	)
 }
 
-// buildURL строит URL для API запроса
+// метод парсера для поиска деталей по конкретной вакансии
+func (p *SJParser) SearchVacanciesDetailes(ctx context.Context, vacancyID string) (models.SearchVacancyDetailesResult, error) {
+	return p.BaseParser.SearchVacancyDetailes(
+		ctx,
+		vacancyID,
+		ParserFuncs{
+			Parse:          p.parseResponseSearchDetails,
+			ConvertDetails: p.convertDetails,
+		},
+	)
+}
+
+// buildURL строит URL для API запроса для поиска списка вакансий
 func (p *SJParser) buildURL(params models.SearchParams) (string, error) {
 	// преобразуем строку запроса в структуру URL
 	u, err := url.Parse(p.baseURL)
@@ -92,12 +104,43 @@ func (p *SJParser) buildURL(params models.SearchParams) (string, error) {
 }
 
 // метод парсера обработки тела запроса
-func (p *SJParser) parseResponse(body []byte) (interface{}, error) {
+func (p *SJParser) parseResponseSearchVacancies(body []byte) (interface{}, error) {
 	var searchResponse model.SuperJobResponse
 	if err := json.Unmarshal(body, &searchResponse); err != nil {
 		return nil, fmt.Errorf("[Parser name: %s] parse reaponse body - failed: %w", p.name, err)
 	}
 	return &searchResponse, nil
+}
+
+// метод парсера обработки тела запроса при поиске списка вакансий
+func (p *SJParser) parseResponseSearchDetails(body []byte) (interface{}, error) {
+	var searchResponse model.SearchDetails //--------------------------------------------------------------------???????
+	if err := json.Unmarshal(body, &searchResponse); err != nil {
+		return nil, fmt.Errorf("[Parser name: %s] parse reaponse body - failed: %w", p.name, err)
+	}
+	return &searchResponse, nil
+}
+
+// метод приведения результатов поиска по конкретной ваансии к нужному типу + проверка данных интерфейса
+func (p *SJParser) convertDetails(detailsResponse interface{}) (models.SearchVacancyDetailesResult, error) {
+	// проверка интерфейса на nil
+	if detailsResponse == nil {
+		return models.SearchVacancyDetailesResult{}, fmt.Errorf("[%s] searchResponse is nil", p.name)
+	}
+
+	// Проводим type assertion
+	searchResp, ok := detailsResponse.(*model.SearchDetails)
+	if !ok {
+
+		// Для более детальной информации можно использовать reflect
+		fmt.Printf("----------------->>>[Parser name: %s] DEBUG: Type details: %v\n", p.name, reflect.TypeOf(searchResp))
+		return models.SearchVacancyDetailesResult{}, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name)
+	}
+
+	var vacDetails models.SearchVacancyDetailesResult
+	vacDetails.Description = searchResp.Description
+
+	return vacDetails, nil
 }
 
 // метод приведения результатов поиска у унифицированной структуре + проверка данных их интерфейса

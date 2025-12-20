@@ -46,20 +46,33 @@ func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 	}
 }
 
-// метод парсера для поиска вакансий
+// метод парсера для поиска списка вакансий
 func (p *HHParser) SearchVacancies(ctx context.Context, params models.SearchParams) ([]models.Vacancy, error) {
 	return p.BaseParser.SearchVacancies(
 		ctx,
 		params,
 		ParserFuncs{
 			BuildURL: p.buildURL,
-			Parse:    p.parseResponse,
+			Parse:    p.parseResponseSearchVacancies,
 			Convert:  p.convertToUniversal,
 		},
 	)
 }
 
-// buildURL строит URL для API запроса
+// метод парсера для поиска деталей по конкретной вакансии
+func (p *HHParser) SearchVacanciesDetailes(ctx context.Context, vacancyID string) (models.SearchVacancyDetailesResult, error) {
+	fmt.Println("vacancy ID для поиска: ", vacancyID)
+	return p.BaseParser.SearchVacancyDetailes(
+		ctx,
+		vacancyID,
+		ParserFuncs{
+			Parse:          p.parseResponseSearchDetails,
+			ConvertDetails: p.convertDetails,
+		},
+	)
+}
+
+// buildURL строит URL для API запроса для поиска списка вакансий
 func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
 	// преобразуем строку запроса в структуру URL
 	u, err := url.Parse(p.baseURL)
@@ -96,9 +109,18 @@ func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
 	return u.String(), nil
 }
 
-// метод парсера обработки тела запроса
-func (p *HHParser) parseResponse(body []byte) (interface{}, error) {
+// метод парсера обработки тела запроса при поиске списка вакансий
+func (p *HHParser) parseResponseSearchVacancies(body []byte) (interface{}, error) {
 	var searchResponse model.SearchResponse
+	if err := json.Unmarshal(body, &searchResponse); err != nil {
+		return nil, fmt.Errorf("[Parser name: %s] parse reaponse body - failed: %w", p.name, err)
+	}
+	return &searchResponse, nil
+}
+
+// метод парсера обработки тела запроса при поиске списка вакансий
+func (p *HHParser) parseResponseSearchDetails(body []byte) (interface{}, error) {
+	var searchResponse model.SearchDetails //--------------------------------------------------------------------???????
 	if err := json.Unmarshal(body, &searchResponse); err != nil {
 		return nil, fmt.Errorf("[Parser name: %s] parse reaponse body - failed: %w", p.name, err)
 	}
@@ -107,13 +129,23 @@ func (p *HHParser) parseResponse(body []byte) (interface{}, error) {
 
 // метод приведения результатов поиска у унифицированной структуре + проверка данных их интерфейса
 func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vacancy, error) {
+	// проверка интерфейса на nil
+	if searchResponse == nil {
+		return []models.Vacancy{}, fmt.Errorf("[%s] searchResponse is nil", p.name)
+	}
+
 	// Проводим type assertion
 	searchResp, ok := searchResponse.(*model.SearchResponse)
 	if !ok {
 
 		// Для более детальной информации можно использовать reflect
 		fmt.Printf("----------------->>>[Parser name: %s] DEBUG: Type details: %v\n", p.name, reflect.TypeOf(searchResponse))
-		return nil, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name)
+		return []models.Vacancy{}, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name) // возвращаем пустой слайс
+	}
+
+	// Проверка на nil внутри структуры
+	if searchResp.Items == nil {
+		return []models.Vacancy{}, nil // Нет ошибки, просто нет данных
 	}
 
 	// сразу инициализируем слайс универсальных вакансий, чтобы уменьшить количество переаалокаций, если выйдем за размер базового массива слайса
@@ -135,7 +167,37 @@ func (p *HHParser) convertToUniversal(searchResponse interface{}) ([]models.Vaca
 			Description: hhvacancy.Description,
 		}
 	}
+
 	return universalVacancies, nil
+}
+
+// метод приведения результатов поиска по конкретной ваансии к нужному типу + проверка данных интерфейса
+func (p *HHParser) convertDetails(detailsResponse interface{}) (models.SearchVacancyDetailesResult, error) {
+	// проверка интерфейса на nil
+	if detailsResponse == nil {
+		return models.SearchVacancyDetailesResult{}, fmt.Errorf("[%s] searchResponse is nil", p.name)
+	}
+
+	// Проводим type assertion
+	searchResp, ok := detailsResponse.(*model.SearchDetails)
+	if !ok {
+
+		// Для более детальной информации можно использовать reflect
+		fmt.Printf("----------------->>>[Parser name: %s] DEBUG: Type details: %v\n", p.name, reflect.TypeOf(searchResp))
+		return models.SearchVacancyDetailesResult{}, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name)
+	}
+
+	vacDetails := models.SearchVacancyDetailesResult{
+		Employer:    models.Employer(searchResp.Employer),
+		Area:        models.Area(searchResp.Area),
+		Salary:      models.Salary(searchResp.Salary),
+		Description: searchResp.Description,
+		Name:        searchResp.Name,
+		ID:          searchResp.ID,
+		Url:         searchResp.Url,
+	}
+
+	return vacDetails, nil
 }
 
 // GetVacancyByID получает детальную информацию о вакансии по ID

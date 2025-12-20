@@ -10,6 +10,7 @@ import (
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
 	ratelimiter "parser/internal/rate_limiter"
+	"parser/pkg"
 	"time"
 )
 
@@ -75,9 +76,10 @@ func createHTTPClient(config BaseConfig) *http.Client {
 
 // ParserFuncs определяет типы специфичных функций парсера
 type ParserFuncs struct {
-	BuildURL func(models.SearchParams) (string, error)
-	Parse    func([]byte) (interface{}, error)
-	Convert  func(interface{}) ([]models.Vacancy, error)
+	BuildURL       func(models.SearchParams) (string, error)
+	Parse          func([]byte) (interface{}, error)
+	Convert        func(interface{}) ([]models.Vacancy, error)
+	ConvertDetails func(interface{}) (models.SearchVacancyDetailesResult, error)
 }
 
 // SearchVacancies общий метод для поиска вакансий
@@ -143,10 +145,76 @@ func (p *BaseParser) SearchVacancies(ctx context.Context, params models.SearchPa
 
 	// если ошибки есть, определяем какого они рода
 	if err != nil {
-		return p.handleCircuitBreakerError(err)
+		return p.handleCircuitBreakerErrorVacanciesSearch(err)
 	}
 
 	return vacancies, nil
+}
+
+// SearchVacancyDetailes общий метод для поиска деталей по конкретной вакансии
+func (p *BaseParser) SearchVacancyDetailes(ctx context.Context, vacancyID string, funcs ParserFuncs) (models.SearchVacancyDetailesResult, error) {
+	// формируем url поиска для базового парсера
+	searchUrl := pkg.UrlBuilder(p.baseURL, vacancyID)
+
+	// заводим переменную, в которую будем складывать результат
+	var vacancyDetails models.SearchVacancyDetailesResult
+
+	// Используем Circuit Breaker для выполнения запроса к внешнему сервису
+	//---------------------------------------------------------------------------------------------------
+	err := p.circuitBreaker.Execute(func() error {
+		// Обработка семафора
+		if err := p.acquireSemaphore(ctx); err != nil {
+			return err
+		}
+		defer p.releaseSemaphore() // после завершения вызова функции, освобождаем семафор
+
+		// Перед осуществлением запроса проверяем rate limiter
+		p.rateLimiter.Wait()
+
+		// Выполнение HTTP запроса
+		resp, err := p.executeRequest(ctx, searchUrl)
+		if err != nil {
+			return err
+		}
+
+		// освобождаем ресурсы
+		defer p.drainAndClose(resp)
+
+		// Проверка статуса
+		if err := p.checkResponseStatus(resp); err != nil {
+			return err
+		}
+
+		// Чтение и парсинг
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response failed: %w", err)
+		}
+
+		// парсим даные
+		parsedData, err := funcs.Parse(body)
+		if err != nil {
+			return fmt.Errorf("parse response failed: %w", err)
+		}
+
+		// пробуем сконвертировать результаты поиска к единому формату. Обязательно type assertion, на входе interface{}
+		converted, err := funcs.ConvertDetails(parsedData)
+		if err != nil {
+			return fmt.Errorf("convert of details - failed: %w", err)
+		}
+
+		vacancyDetails = converted
+
+		return nil
+	})
+
+	// если ошибки есть, определяем какого они рода
+	if err != nil {
+		return p.handleCircuitBreakerErrorVacancyDetails(err)
+	}
+
+	return vacancyDetails, nil
+
 }
 
 // метод проверки доступности семафора
@@ -207,17 +275,6 @@ func (p *BaseParser) checkResponseStatus(resp *http.Response) error {
 	return nil
 }
 
-// метод обработки ошибок. Выясняем это ошибки circuit breaker или внешние ошибки
-func (p *BaseParser) handleCircuitBreakerError(err error) ([]models.Vacancy, error) {
-	if errors.Is(err, circuitbreaker.ErrCircuitOpen) {
-		tR, tS, tF := p.circuitBreaker.GetStats()
-		// Используйте логгер вместо fmt.Printf
-		fmt.Printf("%s circuit breaker open - totalReq=%d, totalSuccess=%d, totalFailures=%d\n", p.name, tR, tS, tF)
-		return nil, fmt.Errorf("%s is temporarily unavailable (circuit breaker open)", p.name)
-	}
-	return nil, fmt.Errorf("search vacancies failed: %w", err)
-}
-
 // GetName возвращает имя парсера
 func (p *BaseParser) GetName() string {
 	return p.name
@@ -230,4 +287,29 @@ func (p *BaseParser) GetHTTPClient() *http.Client {
 
 func (p *BaseParser) GetHealthEndPoint() string {
 	return p.healthEndPoint
+}
+
+// Отдельная функция с дженериками для определния : обычная ошибка или ошибка circuitBreaker
+func handleCircuitBreakerErrorUniversal[T any](name string, cb interfaces.CBInterface, err error) (T, error) {
+	var zero T
+
+	if errors.Is(err, circuitbreaker.ErrCircuitOpen) {
+		tR, tS, tF := cb.GetStats()
+		fmt.Printf("%s circuit breaker open - totalReq=%d, totalSuccess=%d, totalFailures=%d\n",
+			name, tR, tS, tF)
+		return zero, fmt.Errorf("%s is temporarily unavailable (circuit breaker open)", name)
+	}
+	return zero, fmt.Errorf("operation failed: %w", err)
+}
+
+// метод - обёртка для обработки ошибок. Выясняем это ошибки circuit breaker или внешние ошибки.
+// для поиска списка вакнсий
+func (p *BaseParser) handleCircuitBreakerErrorVacanciesSearch(err error) ([]models.Vacancy, error) {
+	return handleCircuitBreakerErrorUniversal[[]models.Vacancy](p.name, p.circuitBreaker, err)
+}
+
+// метод - обёртка для обработки ошибок. Выясняем это ошибки circuit breaker или внешние ошибки.
+// для поиска деталей по конкретной вакансии
+func (p *BaseParser) handleCircuitBreakerErrorVacancyDetails(err error) (models.SearchVacancyDetailesResult, error) {
+	return handleCircuitBreakerErrorUniversal[models.SearchVacancyDetailesResult](p.name, p.circuitBreaker, err)
 }

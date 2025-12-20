@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"parser/internal/domain/models"
 	"strconv"
 	"strings"
 )
 
-// Метод для мульти-поиска
+// Главный метод (точка входа) логики поиска списка вакансий в зарегестрированных и "живых" парсерах
 func (pm *ParsersManager) MultiSearch(scanner *bufio.Scanner) error {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
@@ -35,15 +36,28 @@ func (pm *ParsersManager) MultiSearch(scanner *bufio.Scanner) error {
 	if params.PerPage == 0 {
 		params.PerPage = 20
 	}
+
 	ctx := context.Background()
 
 	// запускаем комплексный метод поиска
-	results, err := pm.search(ctx, params)
+	results, err := pm.searchVacancies(ctx, params)
 	if err != nil {
 		return err
 	}
 
-	// вызываем функцию вывода в консоль информации о результатах поиска
-	pm.printMultiSearchResults(results, params.PerPage)
+	// делаем несколько проверок. Проверка на nil результат, проверка на пустой слайс
+	switch {
+	case results == nil:
+		log.Println("Внимание: получен nil")
+		return fmt.Errorf("ошибка данных")
+	case len(results) == 0:
+		log.Println("Поиск не дал результатов")
+		// Возможно, стоит возвращать специальную ошибку
+		return fmt.Errorf("поиск не дал результатов")
+	default:
+		// вызываем функцию вывода в консоль информации о результатах поиска
+		pm.printMultiSearchResults(results, params.PerPage)
+	}
+
 	return nil
 }

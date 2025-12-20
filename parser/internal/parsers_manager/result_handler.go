@@ -10,7 +10,7 @@ import (
 )
 
 // метод определния типов ошибок, если они были. Или это ошибки circut breaker или другие, или их не было и можно вернуть результат
-func (pm *ParsersManager) handleSearchResult(results []models.SearchResult, err error, params models.SearchParams) ([]models.SearchResult, error) {
+func (pm *ParsersManager) handleSearchResult(results []models.SearchVacanciesResult, err error, params models.SearchParams) ([]models.SearchVacanciesResult, error) {
 	// Случай 1: Всё идеально
 	if err == nil {
 		return results, nil
@@ -36,7 +36,7 @@ func (pm *ParsersManager) handleSearchResult(results []models.SearchResult, err 
 }
 
 // метод - попытка получить данные из кэша (тут понимаем, что это ошибка НЕ от circuit breaker)
-func (pm *ParsersManager) tryFallbackStrategies(params models.SearchParams, originalErr error) ([]models.SearchResult, error) {
+func (pm *ParsersManager) tryFallbackStrategies(params models.SearchParams, originalErr error) ([]models.SearchVacanciesResult, error) {
 	if results, found := pm.tryGetFromCache(params); found {
 		msg := "данные из кэша"
 		return results, fmt.Errorf("%s: %w", msg, originalErr)

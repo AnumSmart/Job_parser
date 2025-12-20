@@ -11,11 +11,11 @@ import (
 )
 
 // concurrentSearchWithTimeout выполняет поиск во всех парсерах одновременно с таймаутом
-func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, params models.SearchParams, parsers []string) ([]models.SearchResult, error) {
+func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, params models.SearchParams, parsers []string) ([]models.SearchVacanciesResult, error) {
 
 	var wg sync.WaitGroup
-	// создаём переменную для резкультатов
-	results := make(chan models.SearchResult, len(parsers))
+	// создаём переменную для результатов
+	results := make(chan models.SearchVacanciesResult, len(parsers))
 
 	// получаем список экземпляров "живых парсеров"
 	aliveParsers := pm.getAliveParsers(parsers)
@@ -33,7 +33,7 @@ func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, param
 
 			// Создаем канал для результата и создаём ещё одну горутину, где производим поиск
 			// 2я - горутина нужна, чтобы потом использовать select и контролировать отмену контекста
-			resultChan := make(chan models.SearchResult, 1)
+			resultChan := make(chan models.SearchVacanciesResult, 1)
 
 			go func() {
 				start := time.Now()
@@ -47,7 +47,7 @@ func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, param
 					pm.parsersStatusManager.UpdateStatus(p.GetName(), true, nil)
 				}
 
-				resultChan <- models.SearchResult{
+				resultChan <- models.SearchVacanciesResult{
 					ParserName: p.GetName(),
 					Vacancies:  vacancies,
 					SearchHash: searchHash,
@@ -59,7 +59,7 @@ func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, param
 			select {
 			case <-ctx.Done():
 				// Таймаут или отмена
-				results <- models.SearchResult{
+				results <- models.SearchVacanciesResult{
 					ParserName: p.GetName(),
 					Error:      fmt.Errorf("timeout exceeded"),
 				}
@@ -76,7 +76,7 @@ func (pm *ParsersManager) concurrentSearchWithTimeout(ctx context.Context, param
 	}()
 
 	// обьявляем переменную для выходных данных
-	var searchResults []models.SearchResult
+	var searchResults []models.SearchVacanciesResult
 
 	for result := range results {
 		searchResults = append(searchResults, result)

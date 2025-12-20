@@ -23,7 +23,7 @@ func (pm *ParsersManager) selectParsersForSearch() []string {
 }
 
 // метод, который позволит асинхронно провести поиск по заданным параметрам среди списка переданных парсеров, учитывается контектс с таймаутом
-func (pm *ParsersManager) searchWithParsers(ctx context.Context, params models.SearchParams, parserNames []string) ([]models.SearchResult, error) {
+func (pm *ParsersManager) searchWithParsers(ctx context.Context, params models.SearchParams, parserNames []string) ([]models.SearchVacanciesResult, error) {
 	searchCtx, cancel := context.WithTimeout(ctx, pm.config.API.ConcSearchTimeout)
 	defer cancel()
 

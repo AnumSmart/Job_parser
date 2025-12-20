@@ -7,7 +7,7 @@ import (
 )
 
 // метод получения данных из поикового кэша по заданному хэшу поиска
-func (pm *ParsersManager) tryGetFromCache(params models.SearchParams) ([]models.SearchResult, bool) {
+func (pm *ParsersManager) tryGetFromCache(params models.SearchParams) ([]models.SearchVacanciesResult, bool) {
 	fmt.Println("\n" + strings.Repeat("=", 50))
 	fmt.Println("⏳ Ищем вакансии в кэше...")
 
@@ -26,7 +26,7 @@ func (pm *ParsersManager) tryGetFromCache(params models.SearchParams) ([]models.
 
 	// если можно получить данные из кэша №1, то получаем интерфейс.
 	// проводим type assertion, проверяем нужный тип
-	results, ok := cached.([]models.SearchResult)
+	results, ok := cached.([]models.SearchVacanciesResult)
 	if !ok {
 		fmt.Println("⚠️  Type assertion для кэшированных данных не удался")
 		return nil, false
@@ -36,8 +36,8 @@ func (pm *ParsersManager) tryGetFromCache(params models.SearchParams) ([]models.
 	return results, true
 }
 
-// метод для кэширования результатов поиска в 2 кэша (в поисковый кэш и в индексный)
-func (pm *ParsersManager) cacheSearchResults(params models.SearchParams, results []models.SearchResult) {
+// метод для кэширования результатов поиска списка вакансий в 2 кэша (в поисковый кэш и в индексный)
+func (pm *ParsersManager) cacheSearchResults(params models.SearchParams, results []models.SearchVacanciesResult) {
 	searchHash, err := pm.generateSearchHash(params)
 	if err != nil {
 		fmt.Printf("⚠️  Не удалось кэшировать результаты: %v\n", err)
@@ -51,6 +51,14 @@ func (pm *ParsersManager) cacheSearchResults(params models.SearchParams, results
 	pm.buildReverseIndex(searchHash, results)
 
 	fmt.Printf("✅ Результаты поиска закэшированы в поисковом кэше (ключ: %s)\n", searchHash)
+}
+
+// метод для кэширования результатов поиска деталей конкретной вакансии по заднанному ID и парсеру (источнику)
+func (pm *ParsersManager) cacheDetailsResult(vacancyID string, results models.SearchVacancyDetailesResult) {
+	//записываем данные в поисковый кэш №3 (для деталей вакансии)
+	pm.searchCache.AddItemWithTTL(vacancyID, results, pm.config.Cache.VacancyCacheConfig.VacancyCacheTTL)
+
+	fmt.Printf("✅ Результаты поиска закэшированы в поисковом кэше (ключ: %s)\n", vacancyID)
 }
 
 // метод обёртка для генерации поискового хэша

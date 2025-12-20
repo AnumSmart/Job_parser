@@ -40,6 +40,17 @@ type SearchResponse struct {
 	Pages int         `json:"pages"`
 }
 
+// предоставляет ответ API HH.ru по запросу с ID
+type SearchDetails struct {
+	Employer    Employer `json:"employer"`
+	Area        Area     `json:"area"`
+	Salary      Salary   `json:"salary"`
+	Description string   `json:"description"`
+	Name        string   `json:"name"`
+	ID          string   `json:"id"`
+	Url         string   `json:"alternate_url"`
+}
+
 // GetSalaryString возвращает форматированную строку зарплаты
 func (v HHVacancy) GetSalaryString() string {
 	if v.Salary.From == 0 && v.Salary.To == 0 {
