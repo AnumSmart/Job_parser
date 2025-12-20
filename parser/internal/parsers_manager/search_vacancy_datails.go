@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"parser/internal/domain/models"
 	"parser/internal/interfaces"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -25,7 +26,7 @@ func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 	compositeID := fmt.Sprintf("%s_%s", source, vacancyID)
 
 	// создаём переменную для искомой вакансии
-	var targetVacancy models.VacancyDetails
+	var targetVacancy models.Vacancy
 
 	fmt.Println("⏳ Загружаем информацию...")
 
@@ -75,7 +76,7 @@ func (pm *ParsersManager) GetVacancyDetails(scanner *bufio.Scanner) error {
 		return fmt.Errorf("Данные устарели, сделайте повторный запрос (пункт меню 1)\n")
 	}
 
-	printVacancyDetails(targetVacancy, "нужно выбрать в меню --- полное описание вакансии по ID")
+	printVacancyDetails(targetVacancy)
 
 	return nil
 }
@@ -97,8 +98,20 @@ func (pm *ParsersManager) GetFullVacancyDetails(scanner *bufio.Scanner) error {
 
 	// делаем несколько проверок. Проверка на nil результат, проверка на пустой слайс
 
-	// ----------------------------------------- нужно додумать!!!
-	fmt.Println(result)
+	// создаём переменную для искомой вакансии
+	var targetVacancy models.Vacancy
+
+	salary := strconv.Itoa(result.Salary.From) // переводим зарплату из int в string
+
+	targetVacancy.Company = result.Employer.Name
+	targetVacancy.Job = result.Name
+	targetVacancy.Description = result.Description
+	targetVacancy.Salary = &salary
+	targetVacancy.Area = result.Area.Name
+	targetVacancy.ID = result.ID
+	targetVacancy.URL = result.Url
+
+	printVacancyDetails(targetVacancy)
 	return nil
 }
 
@@ -137,23 +150,31 @@ func (pm *ParsersManager) searchVacancyDetailes(ctx context.Context, vacancyID, 
 		return checkedCached, nil
 	}
 
+	// делаем проверку того, что источник(парсер) находтся в "живом состоянии"
+	// согласно менеджеру статусов парсверов
+	_, parserIsHeathy := pm.parsersStatusManager.GetParserStatus(source)
+
 	// если в кэше ничего не было найдно, то выполняем запрос в конкретном парсере
 	var parserForRequest interfaces.Parser
 	//выбираем нужный парсер
 	for _, parser := range pm.parsers {
-		if parser.GetName() == source {
+		if parser.GetName() == source && parserIsHeathy == true {
 			parserForRequest = parser
 			break
 		}
 	}
 
+	// делаем запрос выбранный сервис
 	vacancyDetails, err := parserForRequest.SearchVacanciesDetailes(ctx, vacancyID)
+
 	if err != nil {
 		return models.SearchVacancyDetailesResult{}, err
 	}
 
-	return vacancyDetails, nil
+	// кэшируем результат в кэш для результатов поиска деталей вакансии по конкретному ID
+	pm.cacheDetailsResult(vacancyID, vacancyDetails)
 
+	return vacancyDetails, nil
 }
 
 // метод получения имени источника и ID вакансии из ввода
@@ -181,7 +202,7 @@ func (pm *ParsersManager) getCompositeIDFromInput(scanner *bufio.Scanner) (strin
 }
 
 // функция вывода в консоль данных о найденой вакансии
-func printVacancyDetails(vacancy models.VacancyDetails, description string) {
+func printVacancyDetails(vacancy models.Vacancy) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			fmt.Println("recovered from PANIC: [ ", rec, " ]")
@@ -189,29 +210,32 @@ func printVacancyDetails(vacancy models.VacancyDetails, description string) {
 	}()
 
 	fmt.Println("\n" + strings.Repeat("=", 50))
+
 	fmt.Printf("🏢 %s\n", vacancy.Job)
 	fmt.Println(strings.Repeat("=", 50))
 	fmt.Printf("💼 Работодатель: %s\n", vacancy.Company)
-	fmt.Printf("💰 Зарплата: %s\n", *vacancy.Salary)
+
+	// проверяем поле salary на nil, чтобы не словить панику
+	if vacancy.Salary == nil {
+		fmt.Printf("💰 Зарплата: %s\n", "Salary is nil")
+	} else {
+		fmt.Printf("💰 Зарплата: %s\n", *vacancy.Salary)
+	}
+
 	fmt.Printf("📍 Местоположение: %s\n", vacancy.Area)
 	//fmt.Printf("🕐 Опубликовано: %s\n", formatDate(vacancy.PublishedAt))
 	fmt.Printf("🔗 Ссылка: %s\n", vacancy.URL)
 	fmt.Printf("🆔 ID: %s\n", vacancy.ID)
 
 	// Обрезаем описание для читаемости
-	if len(description) > 1000 {
-		description = description[:1000] + "..."
+	if len(vacancy.Description) > 1500 {
+		vacancy.Description = vacancy.Description[:1500] + "..."
 	}
 
-	fmt.Printf("📝 Описание: %s\n", description)
-
-	/*
-		if description != "" {
-			fmt.Println("\n📝 Описание:")
-			//fmt.Println(cleanHTML(description))
-			fmt.Println(description)
-		}
-	*/
+	if vacancy.Description != "" {
+		fmt.Println("\n📝 Описание:")
+		fmt.Println(cleanHTML(vacancy.Description))
+	}
 
 	fmt.Println(strings.Repeat("=", 50))
 }
@@ -220,6 +244,7 @@ func formatDate(t time.Time) string {
 	return t.Format("02.01.2006 15:04")
 }
 
+// функция очистки HTML тегов из строки
 func cleanHTML(text string) string {
 	// Простая очистка HTML тегов
 	text = strings.ReplaceAll(text, "<p>", "\n")

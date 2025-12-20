@@ -200,7 +200,7 @@ func (p *BaseParser) SearchVacancyDetailes(ctx context.Context, vacancyID string
 		// пробуем сконвертировать результаты поиска к единому формату. Обязательно type assertion, на входе interface{}
 		converted, err := funcs.ConvertDetails(parsedData)
 		if err != nil {
-			return fmt.Errorf("convert to universal failed: %w", err)
+			return fmt.Errorf("convert of details - failed: %w", err)
 		}
 
 		vacancyDetails = converted
