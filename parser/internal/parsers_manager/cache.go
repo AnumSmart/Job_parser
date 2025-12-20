@@ -36,7 +36,7 @@ func (pm *ParsersManager) tryGetFromCache(params models.SearchParams) ([]models.
 	return results, true
 }
 
-// метод для кэширования результатов поиска в 2 кэша (в поисковый кэш и в индексный)
+// метод для кэширования результатов поиска списка вакансий в 2 кэша (в поисковый кэш и в индексный)
 func (pm *ParsersManager) cacheSearchResults(params models.SearchParams, results []models.SearchVacanciesResult) {
 	searchHash, err := pm.generateSearchHash(params)
 	if err != nil {
@@ -51,6 +51,14 @@ func (pm *ParsersManager) cacheSearchResults(params models.SearchParams, results
 	pm.buildReverseIndex(searchHash, results)
 
 	fmt.Printf("✅ Результаты поиска закэшированы в поисковом кэше (ключ: %s)\n", searchHash)
+}
+
+// метод для кэширования результатов поиска деталей конкретной вакансии по заднанному ID и парсеру (источнику)
+func (pm *ParsersManager) cacheDetailsResult(vacancyID string, results models.SearchVacancyDetailesResult) {
+	//записываем данные в поисковый кэш №3 (для деталей вакансии)
+	pm.searchCache.AddItemWithTTL(vacancyID, results, pm.config.Cache.VacancyCacheConfig.VacancyCacheTTL)
+
+	fmt.Printf("✅ Результаты поиска закэшированы в поисковом кэше (ключ: %s)\n", vacancyID)
 }
 
 // метод обёртка для генерации поискового хэша

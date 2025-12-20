@@ -72,7 +72,7 @@ func (p *HHParser) SearchVacanciesDetailes(ctx context.Context, vacancyID string
 	)
 }
 
-// buildURL строит URL для API запроса
+// buildURL строит URL для API запроса для поиска списка вакансий
 func (p *HHParser) buildURL(params models.SearchParams) (string, error) {
 	// преобразуем строку запроса в структуру URL
 	u, err := url.Parse(p.baseURL)
@@ -187,10 +187,15 @@ func (p *HHParser) convertDetails(detailsResponse interface{}) (models.SearchVac
 		return models.SearchVacancyDetailesResult{}, fmt.Errorf("[Parser name: %s], wrong data type in the response body\n", p.name)
 	}
 
-	var vacDetails models.SearchVacancyDetailesResult
-	vacDetails.VacancyID = searchResp.ID
-	vacDetails.Vacancy.Job = searchResp.Name
-	vacDetails.Vacancy.Experience = searchResp.Experience
+	vacDetails := models.SearchVacancyDetailesResult{
+		Employer:    models.Employer(searchResp.Employer),
+		Area:        models.Area(searchResp.Area),
+		Salary:      models.Salary(searchResp.Salary),
+		Description: searchResp.Description,
+		Name:        searchResp.Name,
+		ID:          searchResp.ID,
+		Url:         searchResp.Url,
+	}
 
 	return vacDetails, nil
 }

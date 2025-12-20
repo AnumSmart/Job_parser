@@ -8,7 +8,7 @@ import (
 	"parser/internal/domain/models"
 )
 
-// Метод для вывода в консоль результатов поиска (с нужными атрибутами)
+// Метод для вывода в консоль результатов поиска списка вакансий (с нужными атрибутами)
 func (pm *ParsersManager) printMultiSearchResults(results []models.SearchVacanciesResult, resultsPerPage int) {
 	totalVacancies := 0
 

@@ -39,6 +39,7 @@ func (pm *ParsersManager) getAllParsersNames() []string {
 	return names
 }
 
+// метод поиска парсера по имени
 func (pm *ParsersManager) findParserByName(name string) interfaces.Parser {
 	for _, parser := range pm.parsers {
 		if parser.GetName() == name {

@@ -11,24 +11,6 @@ import (
 	"time"
 )
 
-/*
-// структура статуса отдельного парсера
-type ParserStatus struct {
-	Name           string        // имя парсера
-	LastCheck      time.Time     // время последней проверки статуса
-	LastSuccess    time.Time     // время последней успешной проверки
-	ErrorCount     int           // количество состояний, что парсер в ошибке
-	SuccessCount   int           // количество состояний, что парсер - без ошибок
-	IsHealthy      bool          // состояние
-	LastError      error         // последняя ошибка
-	CircuitState   string        // "closed", "open", "half-open" (состояние внутреннего circuit breaker)
-	initialized    bool          // false - просто создан парсер, true - была попытка запроса
-	HealthEndpoint string        // URL для health check
-	ResponseTime   time.Duration // время ответа от парсера
-	mu             sync.RWMutex
-}
-*/
-
 // ParserStatusManager управляет статусами всех парсеров
 // ключ - это имя экземпляра парсера
 type ParserStatusManager struct {
@@ -124,15 +106,6 @@ func (psm *ParserStatusManager) performHealthCheck() {
 
 			// Определяем статус инициализации
 			initDone := true // После первой проверки считаем инициализированным
-
-			/*
-				// Логируем для отладки
-				if err != nil {
-					fmt.Printf("Parser %s: CheckHealth error: %v\n", n, err)
-				} else {
-					fmt.Printf("Parser %s: healthy=%v\n", n, healthy)
-				}
-			*/
 
 			// Отправляем ОДИН результат
 			results <- checkResult{

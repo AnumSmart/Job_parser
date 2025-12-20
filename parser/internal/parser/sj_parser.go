@@ -72,7 +72,7 @@ func (p *SJParser) SearchVacanciesDetailes(ctx context.Context, vacancyID string
 	)
 }
 
-// buildURL строит URL для API запроса
+// buildURL строит URL для API запроса для поиска списка вакансий
 func (p *SJParser) buildURL(params models.SearchParams) (string, error) {
 	// преобразуем строку запроса в структуру URL
 	u, err := url.Parse(p.baseURL)
@@ -138,9 +138,7 @@ func (p *SJParser) convertDetails(detailsResponse interface{}) (models.SearchVac
 	}
 
 	var vacDetails models.SearchVacancyDetailesResult
-	vacDetails.VacancyID = searchResp.ID
-	vacDetails.Vacancy.Job = searchResp.Name
-	vacDetails.Vacancy.Experience = searchResp.Experience
+	vacDetails.Description = searchResp.Description
 
 	return vacDetails, nil
 }

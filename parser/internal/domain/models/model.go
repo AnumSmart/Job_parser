@@ -35,11 +35,33 @@ type SearchVacanciesResult struct {
 	Duration   time.Duration
 }
 
+// Employer представляет информацию о работодателе
+type Employer struct {
+	ID   string
+	Name string
+}
+
+// Area представляет информацию о местоположении
+type Area struct {
+	ID   string
+	Name string
+}
+
+// Salary представляет информацию о зарплате
+type Salary struct {
+	From     int
+	To       int
+	Currency string
+	Gross    bool
+}
+
 // Структура для определния результатов поиска деталей конкретной вакансии
 type SearchVacancyDetailesResult struct {
-	ParserName string
-	VacancyID  string
-	Error      error
-	Duration   time.Duration
-	Vacancy    Vacancy
+	Employer    Employer
+	Area        Area
+	Salary      Salary
+	Description string
+	Name        string
+	ID          string
+	Url         string
 }

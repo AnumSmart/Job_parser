@@ -42,10 +42,13 @@ type SearchResponse struct {
 
 // предоставляет ответ API HH.ru по запросу с ID
 type SearchDetails struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Experience string `json:"experience"`
+	Employer    Employer `json:"employer"`
+	Area        Area     `json:"area"`
+	Salary      Salary   `json:"salary"`
+	Description string   `json:"description"`
+	Name        string   `json:"name"`
+	ID          string   `json:"id"`
+	Url         string   `json:"alternate_url"`
 }
 
 // GetSalaryString возвращает форматированную строку зарплаты
