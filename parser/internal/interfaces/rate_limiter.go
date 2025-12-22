@@ -1,6 +1,8 @@
 package interfaces
 
+import "context"
+
 type RateLimiter interface {
-	Wait() error
+	Wait(ctx context.Context) error
 	Stop()
 }
