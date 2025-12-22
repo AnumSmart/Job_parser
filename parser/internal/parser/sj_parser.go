@@ -42,8 +42,13 @@ func NewSJParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 		ExpectContinueTimeout: cfg.ExpectContinueTimeout,
 	}
 
+	baseParser, err := NewBaseParser(baseCfg)
+	if err != nil {
+		fmt.Printf("ошибка в конфигурации rate limiter для парсера %s\n", baseCfg.Name)
+	}
+
 	return &SJParser{
-		BaseParser: NewBaseParser(baseCfg),
+		BaseParser: baseParser,
 	}
 }
 

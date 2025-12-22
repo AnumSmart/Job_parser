@@ -45,18 +45,24 @@ type BaseParser struct {
 }
 
 // Конструктор, который создает базовый парсер
-func NewBaseParser(config BaseConfig) *BaseParser {
+func NewBaseParser(config BaseConfig) (*BaseParser, error) {
+	// проверяем, что из конфига приходит валидное значение rate
+	rateLimiter, err := ratelimiter.NewChannelRateLimiter(config.RateLimit)
+	if err != nil {
+		return nil, err
+	}
+
 	return &BaseParser{
 		name:           config.Name,
 		baseURL:        config.BaseURL,
 		healthEndPoint: config.HealthEndPoint,
 		apiKey:         config.APIKey,
 		httpClient:     createHTTPClient(config),
-		rateLimiter:    ratelimiter.NewChannelRateLimiter(config.RateLimit),
+		rateLimiter:    rateLimiter,
 		circuitBreaker: circuitbreaker.NewCircutBreaker(config.CircuitBreakerCfg),
 		semaphore:      make(chan struct{}, config.MaxConcurrent),
 		maxConcurrent:  config.MaxConcurrent,
-	}
+	}, nil
 }
 
 // функция, которая создаёт новый клиент с параметрами
@@ -103,7 +109,10 @@ func (p *BaseParser) SearchVacancies(ctx context.Context, params models.SearchPa
 		defer p.releaseSemaphore() // после завершения вызова функции, освобождаем семафор
 
 		// Перед осуществлением запроса проверяем rate limiter
-		p.rateLimiter.Wait()
+		err := p.rateLimiter.Wait(ctx)
+		if err != nil {
+			return err
+		}
 
 		// Выполнение HTTP запроса
 		resp, err := p.executeRequest(ctx, apiURL)
@@ -169,7 +178,10 @@ func (p *BaseParser) SearchVacancyDetailes(ctx context.Context, vacancyID string
 		defer p.releaseSemaphore() // после завершения вызова функции, освобождаем семафор
 
 		// Перед осуществлением запроса проверяем rate limiter
-		p.rateLimiter.Wait()
+		err := p.rateLimiter.Wait(ctx)
+		if err != nil {
+			return err
+		}
 
 		// Выполнение HTTP запроса
 		resp, err := p.executeRequest(ctx, searchUrl)
