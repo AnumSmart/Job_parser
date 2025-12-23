@@ -25,39 +25,39 @@ type CircuitBreaker struct {
 	mu sync.RWMutex
 
 	//Конфигурация
-	failureThreshold    uint          // Макс кол-во ошибок до перехода в Open
-	successThreshold    uint          // Кол-во успешных запросов для перехода в Closed
-	halfOpenMaxRequests uint          // Макс запросов в Half-Open состоянии
+	failureThreshold    uint32        // Макс кол-во ошибок до перехода в Open
+	successThreshold    uint32        // Кол-во успешных запросов для перехода в Closed
+	halfOpenMaxRequests uint32        // Макс запросов в Half-Open состоянии
 	resetTimeout        time.Duration // Время ожидания перед Half-Open
 	windowDuration      time.Duration // Время для подсчета статистики
 
 	// Состояние
 	state            State
-	failures         uint
-	successes        uint
+	failures         uint32
+	successes        uint32
 	lastFailureTime  time.Time
-	halfOpenAttempts uint
+	halfOpenAttempts uint32
 
 	// Статистика
-	totalRequests  uint
-	totalSuccesses uint
-	totalFailures  uint
+	totalRequests  uint32
+	totalSuccesses uint32
+	totalFailures  uint32
 }
 
 func NewCircutBreaker(config CircuitBreakerConfig) *CircuitBreaker {
-	if config.FailureThreshold == 0 {
+	if config.FailureThreshold <= 0 {
 		config.FailureThreshold = 5
 	}
-	if config.SuccessThreshold == 0 {
+	if config.SuccessThreshold <= 0 {
 		config.SuccessThreshold = 3
 	}
-	if config.HalfOpenMaxRequests == 0 {
+	if config.HalfOpenMaxRequests <= 0 {
 		config.HalfOpenMaxRequests = 2
 	}
-	if config.ResetTimeout == 0 {
+	if config.ResetTimeout <= 0 {
 		config.ResetTimeout = 10 * time.Second
 	}
-	if config.WindowDuration == 0 {
+	if config.WindowDuration <= 0 {
 		config.WindowDuration = 10 * time.Second
 	}
 
