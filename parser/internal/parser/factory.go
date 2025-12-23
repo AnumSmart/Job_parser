@@ -22,7 +22,7 @@ const (
 )
 
 // ParserConstructor функция-конструктор парсера
-type ParserConstructor func(config *configs.ParserInstanceConfig) interfaces.Parser
+type ParserConstructor func(config *configs.ParserInstanceConfig) (interfaces.Parser, error)
 
 // ParserFactory фабрика парсеров
 type ParserFactory struct {
@@ -52,18 +52,18 @@ func (f *ParserFactory) Register(parserType ParserType, config *configs.ParserIn
 // Create - создает парсер, если вся инфа до этого была зарегестрирована в фабрике
 func (f *ParserFactory) Create(parserType ParserType) (interfaces.Parser, error) {
 	f.mu.RLock()
-	defer f.mu.RUnlock()
 	// под защитой мьютекса проверяем, есть ли в фабрике зарегестрированный конструктор для данного типа парсера
 	constructor, ok := f.constructors[parserType]
+	// под защитой мьютекса проверяем, есть ли в фабрике зарегестрированный конфиг для данного типа парсера
+	config, configOk := f.configs[parserType]
+	f.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("parser type not registered: %s", parserType)
 	}
-	// под защитой мьютекса проверяем, есть ли в фабрике зарегестрированный конфиг для данного типа парсера
-	config, ok := f.configs[parserType]
-	if !ok {
+	if !configOk {
 		return nil, fmt.Errorf("config not found for parser: %s", parserType)
 	}
-	return constructor(config), nil
+	return constructor(config)
 }
 
 // CreateEnabled создает только включенные парсеры

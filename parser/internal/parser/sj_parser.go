@@ -21,7 +21,7 @@ type SJParser struct {
 }
 
 // конструктор для парсера SuperJob.ru
-func NewSJParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
+func NewSJParser(cfg *configs.ParserInstanceConfig) (interfaces.Parser, error) {
 	if cfg == nil {
 		cfg = configs.DefaultParsersConfig().SuperJob
 	}
@@ -44,12 +44,12 @@ func NewSJParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 
 	baseParser, err := NewBaseParser(baseCfg)
 	if err != nil {
-		fmt.Printf("ошибка в конфигурации rate limiter для парсера %s\n", baseCfg.Name)
+		return nil, fmt.Errorf("ошибка в конфигурации rate limiter для парсера %s\n", baseCfg.Name)
 	}
 
 	return &SJParser{
 		BaseParser: baseParser,
-	}
+	}, nil
 }
 
 // метод парсера для поиска списка вакансий

@@ -21,7 +21,7 @@ type HHParser struct {
 }
 
 // конструктор для парсера HH.ru
-func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
+func NewHHParser(cfg *configs.ParserInstanceConfig) (interfaces.Parser, error) {
 	if cfg == nil {
 		cfg = configs.DefaultParsersConfig().HH
 	}
@@ -43,12 +43,12 @@ func NewHHParser(cfg *configs.ParserInstanceConfig) interfaces.Parser {
 
 	baseParser, err := NewBaseParser(baseCfg)
 	if err != nil {
-		fmt.Printf("ошибка в конфигурации rate limiter для парсера %s\n", baseCfg.Name)
+		return nil, fmt.Errorf("ошибка в конфигурации rate limiter для парсера %s\n", baseCfg.Name)
 	}
 
 	return &HHParser{
 		BaseParser: baseParser,
-	}
+	}, nil
 }
 
 // метод парсера для поиска списка вакансий
