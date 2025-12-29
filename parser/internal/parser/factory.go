@@ -66,8 +66,15 @@ func (f *ParserFactory) Create(parserType ParserType) (interfaces.Parser, error)
 	return constructor(config)
 }
 
-// CreateEnabled создает только включенные парсеры
+// CreateEnabled создает только включенные парсеры (причем логика такая, что должны создаться только те у которых флаг enabled: true)
+// если хоть 1 из таких парсеров - не создан (была ошибка) - то и этот метод вернёт ошибку
 func (f *ParserFactory) CreateEnabled(enabled []ParserType) ([]interfaces.Parser, error) {
+
+	// проверяем, если вообще нет парсеров с разрешённым флагом
+	if len(enabled) == 0 {
+		return nil, fmt.Errorf("no enabled parsers specified")
+	}
+
 	parsers := make([]interfaces.Parser, len(enabled))
 
 	for i, parserType := range enabled {

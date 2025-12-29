@@ -38,13 +38,22 @@ func initApp() (*App, error) {
 	}
 
 	//создаём экземпляр inmemory cache для результатов поиска вакансий
-	searchCache := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.SearchCacheConfig.SearchCacheCleanUp)
+	searchCache, err := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.SearchCacheConfig.SearchCacheCleanUp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create search cache: %w", err)
+	}
 
 	//создаём экземпляр inmemory cache для обратного индекса для вакансий
-	vacancyIndex := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheConfig.VacancyCacheCleanUp)
+	vacancyIndex, err := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheConfig.VacancyCacheCleanUp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vacancy index cache: %w", err)
+	}
 
 	// создаём экземпляр inmemory cache для деталей конкретной вакансии (ключ: ID вакансии)
-	vacancyDetails := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheConfig.VacancyCacheCleanUp)
+	vacancyDetails, err := inmemory_cache.NewInmemoryShardedCache(conf.Cache.NumOfShards, conf.Cache.VacancyCacheConfig.VacancyCacheCleanUp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vacancy details cache: %w", err)
+	}
 
 	//создаём фабрику парсеров
 	parserFactory := parser.NewParserFactory()
@@ -60,7 +69,7 @@ func initApp() (*App, error) {
 	// создаём только те парсеры, у которых в конфиге указано Enabled
 	parsers, err := parserFactory.CreateEnabled(enabledParsers)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create enabled parsers: %w", err)
 	}
 
 	// создаём мэнеджера состояния парсеров и инициализируем начальными значениями
