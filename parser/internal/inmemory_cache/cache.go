@@ -8,9 +8,22 @@ import (
 )
 
 // конструктор для создания кэша с указаным количеством шардов и интервалом очистки кэша
-func NewInmemoryShardedCache(numShards int, cleanUpInterval time.Duration) *InmemoryShardedCache {
-	// инициализируем базовую структуру кэша
+func NewInmemoryShardedCache(numShards int, cleanUpInterval time.Duration) (*InmemoryShardedCache, error) {
+	// Валидация входных параметров
+	if numShards <= 0 {
+		return nil, fmt.Errorf("numShards must be positive, got %d", numShards)
+	}
 
+	if cleanUpInterval < 0 {
+		return nil, fmt.Errorf("cleanUpInterval must be non-negative, got %v", cleanUpInterval)
+	}
+
+	// Дополнительно можно проверять очень большие значения
+	if numShards > 1000 { // или другое разумное ограничение
+		return nil, fmt.Errorf("numShards is too large: %d", numShards)
+	}
+
+	// инициализируем базовую структуру кэша
 	cache := &InmemoryShardedCache{
 		shards:    make([]*Shard, numShards), // инициализируем слайс указателй на шарды
 		numShards: numShards,                 // указывавем количество шардов
@@ -25,9 +38,12 @@ func NewInmemoryShardedCache(numShards int, cleanUpInterval time.Duration) *Inme
 	}
 
 	// асинхронно запускаем метод очистки кэша через поределённый интервал времени
-	go cache.cleanUp(cleanUpInterval)
+	// Запускаем очистку только если интервал > 0
+	if cleanUpInterval > 0 {
+		go cache.cleanUp(cleanUpInterval)
+	}
 
-	return cache
+	return cache, nil
 }
 
 // метод получения значения из кэша по заданному ключу (это хэшированный запрос поиска)

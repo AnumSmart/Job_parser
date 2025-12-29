@@ -46,7 +46,7 @@ func (q *FIFOQueue[T]) Close() {
 	}
 }
 
-// Clear безопасно очищает очередь
+// Clear безопасно очищает очередь, только если очередб не была закрыта.
 func (q *FIFOQueue[T]) Clear() {
 	// Быстрая проверка без блокировки
 	if atomic.LoadInt32(&q.closed) == 1 {

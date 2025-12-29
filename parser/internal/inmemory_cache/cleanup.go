@@ -4,6 +4,7 @@ import "time"
 
 // метод для вызова интервальной очистки кэша или его остановки
 func (c *InmemoryShardedCache) cleanUp(ttl time.Duration) {
+
 	// создаём тикер, который буедт через интервал времени ttl посылать в свой канал ticker.C текущую дату
 	ticker := time.NewTicker(ttl)
 	// останавливаем тикер по выходу из функции
