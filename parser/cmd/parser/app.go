@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"parser/configs"
@@ -11,6 +12,7 @@ import (
 	"parser/internal/parsers_status_manager"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // App содержит все зависимости приложения
@@ -23,6 +25,7 @@ type App struct {
 	parserStatusManager *parsers_status_manager.ParserStatusManager
 	parserManager       *parsers_manager.ParsersManager
 	scanner             *bufio.Scanner
+	server              *Server
 }
 
 // initApp инициализирует все зависимости приложения
@@ -84,6 +87,11 @@ func initApp() (*App, error) {
 	// Создаем сканер для ввода
 	scanner := bufio.NewScanner(os.Stdin)
 
+	server, err := NewServer(context.Background(), conf.Server)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create server: %w", err)
+	}
+
 	// воздвращаем экземпляр приложения
 	return &App{
 		config:              conf,
@@ -94,10 +102,22 @@ func initApp() (*App, error) {
 		parserStatusManager: parserStatusManager,
 		parserManager:       parserManager,
 		scanner:             scanner,
+		server:              server,
 	}, nil
 }
 
 func (a *App) Run() error {
+
+	// Запускаем сервер в горутине
+	go func() {
+		fmt.Printf("🌐 HTTP сервер запущен на %s\n", a.config.Server.Addr())
+		if err := a.server.Run(); err != nil {
+			fmt.Printf("❌ Ошибка сервера: %v\n", err)
+		}
+	}()
+
+	time.Sleep(100 * time.Millisecond) // пока грубая задержка, чтобы дать серверу запуститься
+
 	fmt.Println("🚀 Multi-Source Vacancy Parser запущен!")
 	fmt.Println("==========================")
 
@@ -133,6 +153,7 @@ func (a *App) Run() error {
 			}
 		case "4":
 			a.parserManager.Shutdown()
+			a.server.Shutdown(context.Background())
 			fmt.Println("👋 До свидания!")
 			return nil
 		default:
