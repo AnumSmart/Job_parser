@@ -18,6 +18,7 @@ type Config struct {
 	Parsers     *ParsersConfig
 	Manager     *ParserManagerConfig
 	HealthChech *HealthCheckConfig
+	Server      *ServerConfig
 }
 
 type APIConfig struct {
@@ -57,6 +58,11 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
 	}
 
+	serverConfig, err := LoadYAMLConfig[ServerConfig](os.Getenv("SERVER_CONFIG_ADDRESS_STRING"), DefaultServerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Error during loading config: %s\n", err.Error())
+	}
+
 	return &Config{
 		API: APIConfig{
 			ConcSearchTimeout: time.Duration(concSearchTimeOut) * time.Second,
@@ -65,6 +71,7 @@ func LoadConfig() (*Config, error) {
 		Parsers:     parsersConfig,
 		Manager:     parsersManagerConfig,
 		HealthChech: healthCheckConfig,
+		Server:      serverConfig,
 	}, nil
 }
 
