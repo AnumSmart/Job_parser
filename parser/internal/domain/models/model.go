@@ -4,10 +4,10 @@ import "time"
 
 // общая структура поиска
 type SearchParams struct {
-	Text    string
-	Area    string
-	PerPage int
-	Page    int
+	Text    string `json:"text"`
+	Area    string `json:"area"`
+	PerPage int    `json:"per_page"`
+	Page    int    `json:"page"`
 }
 
 // Стуктура общей вакансии для всех ответов
