@@ -12,6 +12,35 @@ import (
 
 // Главный метод (точка входа) логики поиска списка вакансий в зарегестрированных и "живых" парсерах
 func (pm *ParsersManager) MultiSearch(scanner *bufio.Scanner) error {
+	params := pm.getParamsForCLI(scanner)
+
+	ctx := context.Background()
+
+	// запускаем комплексный метод поиска
+	results, err := pm.searchVacancies(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	// делаем несколько проверок. Проверка на nil результат, проверка на пустой слайс
+	switch {
+	case results == nil:
+		log.Println("Внимание: получен nil")
+		return fmt.Errorf("ошибка данных")
+	case len(results) == 0:
+		log.Println("Поиск не дал результатов")
+		// Возможно, стоит возвращать специальную ошибку
+		return fmt.Errorf("поиск не дал результатов")
+	default:
+		// вызываем функцию вывода в консоль информации о результатах поиска
+		pm.printMultiSearchResults(results, params.PerPage)
+	}
+
+	return nil
+}
+
+// метод получения параметров запроса из командной строки для CLI реализации
+func (pm *ParsersManager) getParamsForCLI(scanner *bufio.Scanner) models.SearchParams {
 	fmt.Println("\n🌐 Мульти-поиск вакансий")
 
 	var params models.SearchParams
@@ -37,27 +66,5 @@ func (pm *ParsersManager) MultiSearch(scanner *bufio.Scanner) error {
 		params.PerPage = 20
 	}
 
-	ctx := context.Background()
-
-	// запускаем комплексный метод поиска
-	results, err := pm.searchVacancies(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	// делаем несколько проверок. Проверка на nil результат, проверка на пустой слайс
-	switch {
-	case results == nil:
-		log.Println("Внимание: получен nil")
-		return fmt.Errorf("ошибка данных")
-	case len(results) == 0:
-		log.Println("Поиск не дал результатов")
-		// Возможно, стоит возвращать специальную ошибку
-		return fmt.Errorf("поиск не дал результатов")
-	default:
-		// вызываем функцию вывода в консоль информации о результатах поиска
-		pm.printMultiSearchResults(results, params.PerPage)
-	}
-
-	return nil
+	return params
 }

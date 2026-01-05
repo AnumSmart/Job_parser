@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -38,7 +38,9 @@ func NewServer(ctx context.Context, config *configs.ServerConfig) (*Server, erro
 }
 
 // Метод для маршрутизации сервера
-func (s *Server) SetUpRoutes() {}
+func (s *Server) SetUpRoutes() {
+	s.router.POST("/")
+}
 
 // Метод для запуска сервера
 func (s *Server) Run() error {
